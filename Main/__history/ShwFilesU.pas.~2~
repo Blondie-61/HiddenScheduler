@@ -1,0 +1,242 @@
+﻿unit ShwFilesU;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.Grids, Vcl.ValEdit, System.Actions, Vcl.ActnList,
+  Vcl.StdCtrls, Math, System.IOUtils, System.JSON, System.DateUtils, System.IniFiles;
+
+type
+  TShwFiles = class(TForm)
+    btnSave: TButton;
+    btnReFresh: TButton;
+    btnWakeSelectedf: TButton;
+    ntnRemoveSelected: TButton;
+    ActionList1: TActionList;
+    actSave: TAction;
+    actReFresh: TAction;
+    actWakeSelected: TAction;
+    actRemoveSelected: TAction;
+    SGHiddenFiles: TStringGrid;
+
+    procedure FormCreate(Sender: TObject);
+    procedure FormShow(Sender: TObject);
+
+    procedure actReFreshExecute(Sender: TObject);
+
+    procedure SGHiddenFilesSelectCell(Sender: TObject; ACol, ARow: Integer; var CanSelect: Boolean);
+    procedure SGHiddenFilesSetEditText(Sender: TObject; ACol, ARow: Integer; const Value: string);
+
+    //procedure SGHiddenFilesDrawCell(Sender: TObject; ACol, ARow: Integer; Rect: TRect; State: TGridDrawState);
+ private
+    procedure AutoSizeColumns;
+    { Private-Deklarationen }
+  public
+    { Public-Deklarationen }
+  end;
+
+var
+  ShwFiles: TShwFiles;
+
+implementation
+
+{$R *.dfm}
+
+uses WakeHiddenU;
+
+procedure TShwFiles.FormCreate(Sender: TObject);
+begin
+  SGHiddenFiles.FixedRows := 1;
+  SGHiddenFiles.RowCount := 1;
+  SGHiddenFiles.ColCount := 5;
+
+  SGHiddenFiles.Cells[0, 0] := 'Verzeichnis';
+  SGHiddenFiles.Cells[1, 0] := 'Dateiname';
+  SGHiddenFiles.Cells[2, 0] := 'Verstecken';
+  SGHiddenFiles.Cells[3, 0] := 'Aufwachen';
+  SGHiddenFiles.Cells[4, 0] := 'Min. bis Aufwachen';
+
+  SGHiddenFiles.Options := [
+    goEditing,       // Editieren einzelner Zellen
+    goColSizing,     // Spaltenbreite anpassen
+    goThumbTracking  // Smoothes Scrollen
+                           ];
+end;
+
+procedure TShwFiles.FormShow(Sender: TObject);
+begin
+  actRefresh.Execute;
+end;
+
+procedure TShwFiles.AutoSizeColumns;
+var
+  col, row, textWidth, padding: Integer;
+  txt: string;
+begin
+  padding := 12; // etwas Luft rechts
+
+  for col := 0 to SGHiddenFiles.ColCount - 1 do
+  begin
+    textWidth := SGHiddenFiles.Canvas.TextWidth(SGHiddenFiles.Cells[col, 0]); // Header
+
+    for row := 1 to SGHiddenFiles.RowCount - 1 do
+    begin
+      txt := SGHiddenFiles.Cells[col, row];
+      textWidth := Max(textWidth, SGHiddenFiles.Canvas.TextWidth(txt)) + 16;
+    end;
+
+    SGHiddenFiles.ColWidths[col] := textWidth + padding;
+  end;
+end;
+
+procedure TShwFiles.SGHiddenFilesSelectCell(Sender: TObject; ACol, ARow: Integer; var CanSelect: Boolean);
+begin
+  // Nur Spalte 3 (wakeTime) und 5 (autoHideAfter) editierbar
+  CanSelect := (ARow > 0) and ((ACol = 3) or (ACol = 4));
+end;
+
+procedure TShwFiles.SGHiddenFilesSetEditText(Sender: TObject; ACol, ARow: Integer; const Value: string);
+var
+  filePath, jsonFile, jsonStr: string;
+  jsonArr: TJSONArray;
+  jsonObj: TJSONObject;
+  i, minToWake: Integer;
+  newWakeTime, dt: TDateTime;
+begin
+  if ARow < 1 then Exit;
+  if SGHiddenFiles.EditorMode then Exit;
+
+  filePath := TPath.Combine(SGHiddenFiles.Cells[0, ARow], SGHiddenFiles.Cells[1, ARow]);
+  jsonFile := GetJsonFilePath;
+
+  if not TFile.Exists(jsonFile) then Exit;
+  jsonStr := TFile.ReadAllText(jsonFile);
+  jsonArr := TJSONObject.ParseJSONValue(jsonStr) as TJSONArray;
+  if not Assigned(jsonArr) then Exit;
+
+  for i := 0 to jsonArr.Count - 1 do
+  begin
+    jsonObj := jsonArr.Items[i] as TJSONObject;
+    if jsonObj.GetValue<string>('path') = filePath then
+    begin
+      case ACol of
+        3: // wakeTime (direkt gesetzt)
+        begin
+          if not TryStrToDateTime(Trim(Value), dt) then
+          begin
+            ShowMessage('❌ Ungültiges Datums-/Zeitformat. Bitte z. B. "04.07.2025 08:00" eingeben.');
+            Exit;
+          end;
+          jsonObj.RemovePair('wakeTime');
+          jsonObj.AddPair('wakeTime', DateToISO8601(dt, True));
+          SGHiddenFiles.Cells[ACol, ARow] := FormatDateTime('dd.mm.yyyy hh:nn:ss', dt);
+        end;
+
+        4: // Minuten bis zum Aufwachen → wakeTime = Now + Minuten
+        begin
+          if not TryStrToInt(Value, minToWake) then
+          begin
+            ShowMessage('❌ Bitte eine gültige Ganzzahl für "Minuten bis zum Aufwachen" eingeben.');
+            Exit;
+          end;
+
+          newWakeTime := Now + EncodeTime(minToWake div 60, minToWake mod 60, 0, 0);
+          jsonObj.RemovePair('wakeTime');
+          jsonObj.AddPair('wakeTime', DateToISO8601(newWakeTime, True));
+
+          SGHiddenFiles.Cells[3, ARow] := FormatDateTime('dd.mm.yyyy hh:nn:ss', newWakeTime);
+          SGHiddenFiles.Cells[4, ARow] := IntToStr(minToWake); // ggf. normieren
+        end;
+      end;
+      Break;
+    end;
+  end;
+
+  TFile.WriteAllText(jsonFile, jsonArr.ToJSON);
+  jsonArr.Free;
+
+  Log('📝 Änderung gespeichert für ' + filePath);
+end;
+
+procedure TShwFiles.actReFreshExecute(Sender: TObject);
+var
+  jsonPath, jsonStr, filePath, dirPath, fileName, wakeStr, hideStr: string;
+  jsonArr: TJSONArray;
+  jsonObj: TJSONObject;
+  wakeTime, hideTime: TDateTime;
+  i, row: Integer;
+begin
+  jsonPath := TPath.Combine(GetEnvironmentVariable('LOCALAPPDATA'), 'HiddenScheduler\hidden_files.json');
+
+  if not TFile.Exists(jsonPath) then
+  begin
+    //ShowMessage('Keine JSON-Datei gefunden.');
+    Exit;
+  end;
+
+  jsonStr := TFile.ReadAllText(jsonPath);
+  jsonArr := TJSONObject.ParseJSONValue(jsonStr) as TJSONArray;
+
+  if not Assigned(jsonArr) then
+  begin
+    ShowMessage('Fehler beim Parsen der JSON-Datei.');
+    Exit;
+  end;
+
+  SGHiddenFiles.RowCount := jsonArr.Count + 1;
+
+  for i := 0 to jsonArr.Count - 1 do
+  begin
+    jsonObj := jsonArr.Items[i] as TJSONObject;
+
+    filePath := jsonObj.GetValue('path').Value;
+    hideStr := jsonObj.GetValue('hideTime').Value;
+    wakeStr := jsonObj.GetValue('wakeTime').Value;
+
+    fileName := TPath.GetFileName(filePath);
+    dirPath := TPath.GetDirectoryName(filePath);
+
+    try
+      hideTime := ISO8601ToDate(hideStr, True);
+      wakeTime := ISO8601ToDate(wakeStr, True);
+    except
+      ShowMessage('Fehler beim Parsen von Datum für: ' + filePath);
+      Continue;
+    end;
+
+    row := i + 1;
+    SGHiddenFiles.Cells[0, row] := dirPath;
+    SGHiddenFiles.Cells[1, row] := fileName;
+    SGHiddenFiles.Cells[2, row] := FormatDateTime('dd.mm.yyyy hh:nn:ss', hideTime);
+    SGHiddenFiles.Cells[3, row] := FormatDateTime('dd.mm.yyyy hh:nn:ss', wakeTime);
+    SGHiddenFiles.Cells[4, row] := IntToStr(Round((wakeTime - Now) * 24 * 60));
+  end;
+
+  jsonArr.Free;
+
+  AutoSizeColumns;
+end;
+
+(*
+procedure TShwFiles.SGHiddenFilesDrawCell(Sender: TObject; ACol, ARow: Integer; Rect: TRect; State: TGridDrawState);
+var
+  txt: string;
+  minutes: Integer;
+begin
+  if ARow = 0 then Exit; // Überschrift
+
+  if ACol = 4 then
+  begin
+    txt := SGHiddenFiles.Cells[ACol, ARow];
+    if TryStrToInt(txt, minutes) and (minutes < 0) then
+    begin
+      SGHiddenFiles.Canvas.Brush.Color := $FFE0E0; // rosa
+      SGHiddenFiles.Canvas.FillRect(Rect);
+      SGHiddenFiles.Canvas.TextOut(Rect.Left + 4, Rect.Top + 2, txt);
+      Exit;
+    end;
+  end;
+end;
+*)
+end.

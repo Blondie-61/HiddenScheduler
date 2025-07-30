@@ -1,0 +1,146 @@
+unit WakeTimeDialog;
+
+interface
+
+uses
+  System.SysUtils, System.Classes, Vcl.Controls, Vcl.Forms, Vcl.StdCtrls, Vcl.ComCtrls, Vcl.ExtCtrls,
+  System.DateUtils;
+
+type
+  TfrmWakeTimeDialog = class(TForm)
+    lblPrompt: TLabel;
+    DTWakeTime: TDateTimePicker;
+    BtnOK: TButton;
+    BtnCancel: TButton;
+    BtnPlus1h: TButton;
+    BtnMorgen: TButton;
+    BtnWochenende: TButton;
+    BtnJetzt: TButton;
+    BtnPlus1d: TButton;
+    procedure FormShow(Sender: TObject);
+    procedure BtnPlus1hClick(Sender: TObject);
+    procedure BtnMorgenClick(Sender: TObject);
+    procedure BtnWochenendeClick(Sender: TObject);
+    procedure BtnJetztClick(Sender: TObject);
+    procedure BtnPlus1dClick(Sender: TObject);
+    procedure dtWakeTimeKeyPress(Sender: TObject; var Key: Char);
+  private
+
+  public
+    class function Execute(out selectedTime: TDateTime): Boolean;
+  end;
+
+var
+  frmWakeTimeDialog: TfrmWakeTimeDialog;
+
+implementation
+
+{$R *.dfm}
+
+procedure TfrmWakeTimeDialog.FormShow(Sender: TObject);
+begin
+  btnJetzt.Click;
+end;
+
+procedure TfrmWakeTimeDialog.BtnPlus1hClick(Sender: TObject);
+begin
+  DTWakeTime.DateTime := DTWakeTime.DateTime + EncodeTime(1, 0, 0, 0);
+end;
+
+procedure TfrmWakeTimeDialog.BtnMorgenClick(Sender: TObject);
+var
+  dt: TDateTime;
+begin
+  dt := IncDay(Now);
+  dt := RecodeDateTime(dt, YearOf(dt), MonthOf(dt), DayOf(dt), 14, 0, 0, 0); // Samstag 14:00
+  DTWakeTime.DateTime := dt;
+end;
+
+procedure TfrmWakeTimeDialog.BtnWochenendeClick(Sender: TObject);
+var
+  dt: TDateTime;
+begin
+  dt := Now;
+  while DayOfWeek(dt) <> 2 do // 2 = Montag
+    dt := IncDay(dt);
+  dt := RecodeDateTime(dt, YearOf(dt), MonthOf(dt), DayOf(dt), 8, 0, 0, 0);
+  DTWakeTime.DateTime := dt;
+end;
+
+procedure TfrmWakeTimeDialog.BtnJetztClick(Sender: TObject);
+var
+  dt: TDateTime;
+  hour, min: Word;
+begin
+  dt := Now;
+  hour := HourOf(dt);
+  min := MinuteOf(dt);
+
+  if min > 0 then
+    Inc(hour);
+
+  if hour >= 24 then
+  begin
+    dt := IncDay(StartOfTheDay(dt), 1);
+    hour := 0;
+  end
+  else
+    dt := StartOfTheDay(dt);
+
+  dt := dt + EncodeTime(hour, 0, 0, 0);
+  DTWakeTime.DateTime := dt;
+end;
+
+procedure TfrmWakeTimeDialog.BtnPlus1dClick(Sender: TObject);
+begin
+  DTWakeTime.DateTime := DTWakeTime.DateTime + 1;
+end;
+
+procedure TfrmWakeTimeDialog.dtWakeTimeKeyPress(Sender: TObject; var Key: Char);
+
+  function Add_1_Min(aDate: TDateTime): TDateTime;
+  begin
+//    Result := IncMinute(StartOfTheDay(aDate), 1);
+
+    var dt := aDate;
+    var hour := HourOf(dt);
+    var min := MinuteOf(dt) + 1;
+
+    if min > 60 then
+    begin
+      Inc(hour);
+      min := 0;
+    end;
+
+    if hour >= 24 then
+    begin
+      dt := IncDay(StartOfTheDay(dt), 1);
+      hour := 0;
+    end
+    else
+      dt := StartOfTheDay(dt);
+
+    dt := dt + EncodeTime(0, min, 0, 0);
+    Result := dt;
+  end;
+
+begin
+  if (Uppercase(Key) = 'J') then
+  begin
+    DTWakeTime.DateTime := Add_1_Min(DTWakeTime.DateTime);
+  end;
+end;
+
+class function TfrmWakeTimeDialog.Execute(out selectedTime: TDateTime): Boolean;
+begin
+  with TfrmWakeTimeDialog.Create(nil) do
+  try
+    Result := ShowModal = mrOK;
+    if Result then
+      selectedTime := DTWakeTime.DateTime;
+  finally
+    Free;
+  end;
+end;
+
+end.

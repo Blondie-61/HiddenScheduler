@@ -1,0 +1,28 @@
+unit FormToastU;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls;
+
+type
+  TFormToastF = class(TForm)
+    lblTitel: TLabel;
+    lblMsg: TLabel;
+    btnSnooze5: TButton;
+    Close: TButton;
+  private
+    { Private-Deklarationen }
+  public
+    { Public-Deklarationen }
+  end;
+
+var
+  FormToastF: TFormToastF;
+
+implementation
+
+{$R *.dfm}
+
+end.

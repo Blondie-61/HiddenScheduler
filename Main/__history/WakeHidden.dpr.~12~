@@ -1,0 +1,25 @@
+﻿program WakeHidden;
+
+uses
+  Vcl.Forms,
+  IniFiles,
+  System.IOUtils,
+  System.SysUtils,
+  WakeHiddenU in 'WakeHiddenU.pas' {FormWake},
+  ShwFilesU in 'ShwFilesU.pas' {ShwFiles},
+  FormToastU in 'FormToastU.pas' {FormToastF},
+  AppIconHostU in 'AppIconHostU.pas' {FormAppIconHost};
+
+{$R *.res}
+begin
+  Application.Initialize;
+  Application.MainFormOnTaskbar := True;
+
+  Application.CreateForm(TFormAppIconHost, FormAppIconHost);
+
+  Application.CreateForm(TShwFiles, ShwFiles);
+  Application.CreateForm(TFormToastF, FormToastF);
+  Application.CreateForm(TFormWake, FormWake);
+
+  Application.Run;
+end.

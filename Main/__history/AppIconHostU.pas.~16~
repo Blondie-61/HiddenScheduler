@@ -1,0 +1,100 @@
+﻿// === Datei: AppIconHostU.pas ===
+unit AppIconHostU;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.Classes, Vcl.Forms, Vcl.Graphics, Vcl.Controls,
+  IOUtils, IniFiles;
+
+type
+  TFormAppIconHost = class(TForm)
+  private
+    FShowAppIcon: Boolean;
+  protected
+    procedure CreateParams(var Params: TCreateParams); override;
+    procedure WMActivateApp(var Msg: TWMActivateApp); message WM_ACTIVATEAPP;
+  public
+    constructor Create(AOwner: TComponent); override;
+    property ShowAppIcon: Boolean read FShowAppIcon write FShowAppIcon;
+  end;
+
+var
+  FormAppIconHost: TFormAppIconHost;
+  AppStartTick: Integer;
+
+implementation
+
+uses ShwFilesU, WakeHiddenU;
+
+{$R *.dfm}
+
+constructor TFormAppIconHost.Create(AOwner: TComponent);
+begin
+  inherited CreateNew(AOwner);
+  AppStartTick := GetTickCount;
+
+  BorderStyle := bsNone;
+  BorderIcons := [];
+  Width := 1;
+  Height := 1;
+  Left := -10000;
+  Top := -10000;
+
+  // NICHT sichtbar machen
+  Visible := False;
+  //ShowWindow(Handle, SW_HIDE); // redundant, aber zur Sicherheit
+end;
+
+procedure TFormAppIconHost.CreateParams(var Params: TCreateParams);
+
+  function TaskbarIconEnabled: Boolean;
+  var
+    ini: TIniFile;
+  begin
+    ini := TIniFile.Create(TPath.Combine(GetAppDataPath, 'settings.ini'));
+    try
+      Result := ini.ReadBool('Options', 'ShowInTaskbar', True); // Default: aktiv
+    finally
+      ini.Free;
+    end;
+  end;
+
+begin
+  inherited CreateParams(Params);
+
+  if not TaskbarIconEnabled then
+    Params.ExStyle := Params.ExStyle or WS_EX_TOOLWINDOW
+  else
+    Params.ExStyle := Params.ExStyle or WS_EX_APPWINDOW;
+end;
+
+procedure TFormAppIconHost.WMActivateApp(var Msg: TWMActivateApp);
+begin
+  inherited;
+  ENABLE_LOGGING := True;
+
+  if not Msg.Active then Exit;
+
+  // Beim Start 2 Sekunden ignorieren
+  if (GetTickCount - AppStartTick < 2000) or (AppStartTick = 0) then
+  begin
+    Log('⚠️ Aktivierung zu früh – ignoriert');
+    Exit;
+  end;
+
+  // Prüfen, ob der Fokus aus unserer App kommt
+  var prev := GetForegroundWindow;
+
+  if (prev = Handle) or (prev = ShwFiles.Handle) or (prev = FormWake.Handle) then
+  begin
+    Log('⚠️ Aktivierung aus eigener App – ignoriert');
+    Exit;
+  end;
+
+  Log('🖱 App-Icon aktiviert → ShwFiles anzeigen');
+  ShwFiles.Show;
+  ShwFiles.BringToFront;
+end;
+
+end.

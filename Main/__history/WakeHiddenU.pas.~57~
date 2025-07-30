@@ -1,0 +1,678 @@
+﻿unit WakeHiddenU;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ExtCtrls, System.ImageList, Vcl.ImgList, System.Actions, Vcl.ActnList, Vcl.Menus,
+  System.IOUtils, System.JSON, System.DateUtils, System.IniFiles, MMSystem, Winapi.CommCtrl, StrUtils;
+type
+  TFormWake = class(TForm)
+    Timer1: TTimer;
+    PopupMenu1: TPopupMenu;
+    Jetztprfen1: TMenuItem;
+    Jetztprfen2: TMenuItem;
+    Beenden1: TMenuItem;
+    ActionList1: TActionList;
+    actCheckNow: TAction;
+    actWakeAll: TAction;
+    actExit: TAction;
+    ImageListWithBadge: TImageList;
+    TrayIcon1: TTrayIcon;
+    actShwFileShw: TAction;
+    ZeigeDateien1: TMenuItem;
+    N1: TMenuItem;
+    Scannenaus1: TMenuItem;
+    N2: TMenuItem;
+    N3: TMenuItem;
+    mnuSelectSound: TMenuItem;
+    mnuPlaySound: TMenuItem;
+    mnuSnoozeEnabled: TMenuItem;
+    N4: TMenuItem;
+    mnuSnooze5: TMenuItem;
+    mnuSnooze15: TMenuItem;
+    mnuSnooze60: TMenuItem;
+    PopupMenuSnooze: TPopupMenu;
+    Snooze5Min1: TMenuItem;
+    Snooze15Minuten1: TMenuItem;
+    Snooze15Minuten2: TMenuItem;
+
+    procedure CreateParams(var Params: TCreateParams);
+    procedure FormCreate(Sender: TObject);
+    procedure FormShow(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+
+    procedure actCheckNowExecute(Sender: TObject);
+    procedure actWakeAllExecute(Sender: TObject);
+    procedure actExitExecute(Sender: TObject);
+    procedure actShwFileShwExecute(Sender: TObject);
+
+    procedure mnuSelectSoundClick(Sender: TObject);
+    procedure mnuSnooze15Click(Sender: TObject);
+    procedure mnuSnooze5Click(Sender: TObject);
+    procedure mnuSnooze60Click(Sender: TObject);
+    procedure Scannenaus1Click(Sender: TObject);
+    procedure Timer1Timer(Sender: TObject);
+    procedure TrayIcon1DblClick(Sender: TObject);
+    procedure TrayIcon1MouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+  private
+    procedure ShowBlueBadgeIcon(durationSecs: Integer = 60);
+    procedure ShowRedBadgeIcon(durationSecs: Integer = 60);
+    procedure LoadDefaultIcon;
+    { Private-Deklarationen }
+  public
+    { Public-Deklarationen }
+  end;
+
+var
+  FormWake: TFormWake;
+  WakeupSoundFile: string = '';
+  SnoozeActive: Boolean = False;
+  SnoozeEndTime: TDateTime;
+  LastWokenFile: string = '';
+  BadgeSessionID: Integer = 0;
+
+const
+  ENABLE_LOGGING = True;
+
+function GetAppDataPath: string;
+function GetJsonFilePath: string;
+procedure Log(const msg: string);
+procedure DoSnooze(minutes: Integer);
+procedure LoadSettings;
+procedure SaveSettings;
+
+implementation
+
+{$R *.dfm}
+{$R WakeHidden.res}
+
+uses ShwFilesU, FormToastU;
+
+function GetAppDataPath: string;
+begin
+  Result := TPath.Combine(GetEnvironmentVariable('LOCALAPPDATA'), 'HiddenScheduler');
+  ForceDirectories(Result);
+end;
+
+function GetJsonFilePath: string;
+begin
+  Result := TPath.Combine(GetAppDataPath, 'hidden_files.json');
+end;
+
+procedure Log(const msg: string);
+var
+  logFile: string;
+  F: TextFile;
+  retryCount: Integer;
+begin
+  if ENABLE_LOGGING then
+  begin
+    logFile := TPath.Combine(GetEnvironmentVariable('TEMP'), 'HideFile.log');
+    retryCount := 0;
+
+    while retryCount < 10 do
+    begin
+      try
+        TFile.AppendAllText(logFile,
+          Format('[%s] %s%s', [FormatDateTime('yyyy-mm-dd hh:nn:ss', Now), msg, sLineBreak]),
+          TEncoding.UTF8);
+        Exit; // nur bei Erfolg
+      except
+        on E: Exception do
+        begin
+          Inc(retryCount);
+          Sleep(100);
+        end;
+      end;
+    end;
+  end;
+end;
+
+procedure SetJsonValue(obj: TJSONObject; const key, value: string);
+begin
+  if obj.GetValue(key) <> nil then
+    obj.RemovePair(key);
+  obj.AddPair(key, value);
+end;
+
+function IsHidden(const path: string): Boolean;
+begin
+  Result := (GetFileAttributes(PChar(path)) and FILE_ATTRIBUTE_HIDDEN) <> 0;
+end;
+
+procedure PlayWakeupSound;
+begin
+  if FormWake.mnuPlaySound.Checked and FileExists(WakeupSoundFile) then
+    PlaySound(PChar(WakeupSoundFile), 0, SND_FILENAME or SND_ASYNC);
+end;
+
+procedure SetTrayIconFromImageList(index: Integer);
+var
+  ico: TIcon;
+begin
+  ico := TIcon.Create;
+  try
+    FormWake.ImageListWithBadge.GetIcon(index, ico);
+    FormWake.TrayIcon1.Icon := ico;
+    FormWake.TrayIcon1.Visible := False;
+    FormWake.TrayIcon1.Visible := True;
+  finally
+    ico.Free;
+  end;
+end;
+
+procedure UpdateSnoozeMenuItems(visible: Boolean);
+begin
+  Log('🛠 Menüeinträge Snooze sichtbar: ' + BoolToStr(visible, True));
+  FormWake.mnuSnooze5.Visible := visible;
+  FormWake.mnuSnooze15.Visible := visible;
+  FormWake.mnuSnooze60.Visible := visible;
+end;
+
+procedure UpdateJsonEntry(const filePath: string; const newHide, newWake: TDateTime; const newStatus: string);
+var
+  jsonFile, jsonStr: string;
+  jsonArr: TJSONArray;
+  jsonObj: TJSONObject;
+  i: Integer;
+begin
+  jsonFile := GetJsonFilePath;
+  if not TFile.Exists(jsonFile) then Exit;
+
+  jsonStr := TFile.ReadAllText(jsonFile);
+  jsonArr := TJSONObject.ParseJSONValue(jsonStr) as TJSONArray;
+  if not Assigned(jsonArr) then Exit;
+
+  for i := 0 to jsonArr.Count - 1 do
+  begin
+    jsonObj := jsonArr.Items[i] as TJSONObject;
+    if jsonObj.GetValue<string>('path') = filePath then
+    begin
+      jsonObj.RemovePair('hideTime');
+      jsonObj.RemovePair('wakeTime');
+      jsonObj.RemovePair('status');
+
+      jsonObj.AddPair('hideTime', DateToISO8601(newHide, True));
+      jsonObj.AddPair('wakeTime', DateToISO8601(newWake, True));
+      jsonObj.AddPair('status', newStatus);
+      Break;
+    end;
+  end;
+
+  TFile.WriteAllText(jsonFile, jsonArr.ToJSON);
+  jsonArr.Free;
+end;
+
+procedure DoSnooze(minutes: Integer);
+var
+  filePath, jsonFile: string;
+  jsonArr: TJSONArray;
+  jsonObj: TJSONObject;
+  wakeTime: TDateTime;
+begin
+  if SnoozeActive then
+  begin
+    Log('⚠️ Snooze bereits aktiv – erneuter Start abgebrochen');
+    Exit;
+  end;
+
+  Inc(BadgeSessionID); // damit alte Threads enden
+  SnoozeActive := False;
+  FormWake.LoadDefaultIcon;
+
+  if LastWokenFile = '' then
+  begin
+    Log('⚠️ Snooze abgebrochen – keine geweckte Datei vorhanden');
+    Exit;
+  end;
+
+  filePath := LastWokenFile;
+  wakeTime := Now + EncodeTime(0, minutes, 0, 0);
+
+  // Datei erneut verstecken
+  if FileExists(filePath) then
+  begin
+    var attrs := GetFileAttributes(PChar(filePath));
+    if (attrs and FILE_ATTRIBUTE_HIDDEN) = 0 then
+    begin
+      SetFileAttributes(PChar(filePath), attrs or FILE_ATTRIBUTE_HIDDEN);
+      Log('😴 Datei erneut versteckt (Snooze): ' + filePath);
+    end;
+  end;
+
+  // Eintrag in JSON neu anlegen
+  jsonFile := GetJsonFilePath;
+  if TFile.Exists(jsonFile) then
+    jsonArr := TJSONObject.ParseJSONValue(TFile.ReadAllText(jsonFile)) as TJSONArray
+  else
+    jsonArr := TJSONArray.Create;
+
+  if not Assigned(jsonArr) then
+  begin
+    jsonArr := TJSONArray.Create;
+    Log('⚠️ Fehler beim Parsen der JSON – neue Liste angelegt (Snooze)');
+  end;
+
+  jsonObj := TJSONObject.Create;
+  jsonObj.AddPair('path', filePath);
+  jsonObj.AddPair('hideTime', FormatDateTime('yyyy-mm-dd"T"hh:nn:ss', Now));
+  jsonObj.AddPair('wakeTime', FormatDateTime('yyyy-mm-dd"T"hh:nn:ss', wakeTime));
+  jsonArr.AddElement(jsonObj);
+
+  TFile.WriteAllText(jsonFile, jsonArr.ToJSON);
+  Log(Format('🔁 Schlummern: %s für %d Minuten', [filePath, minutes]));
+
+  jsonArr.Free;
+  if (ShwFiles.Visible) then
+    ShwFiles.actReFreshExecute(nil);
+
+  // 🆕 Neue Snooze-Badge starten
+//  FormWake.ShowBadgeIcon;
+end;
+
+procedure CheckAndWakeFiles;
+var
+  jsonFile, jsonStr, filePath, wakeTimeStr, hideTimeStr: string;
+  jsonArr, newList: TJSONArray;
+  jsonObj: TJSONObject;
+  wakeTime, hideTime: TDateTime;
+  i: Integer;
+  processedPaths: TStringList;
+  fileAttr: DWORD;
+begin
+  jsonFile := GetJsonFilePath;
+  if not TFile.Exists(jsonFile) then Exit;
+
+  try
+    jsonStr := TFile.ReadAllText(jsonFile);
+    jsonArr := TJSONObject.ParseJSONValue(jsonStr) as TJSONArray;
+    if not Assigned(jsonArr) then Exit;
+
+    newList := TJSONArray.Create;
+    processedPaths := TStringList.Create;
+    processedPaths.CaseSensitive := False;
+    processedPaths.Sorted := True;
+
+    for i := 0 to jsonArr.Count - 1 do
+    begin
+      jsonObj := jsonArr.Items[i] as TJSONObject;
+      filePath := jsonObj.GetValue('path').Value;
+      fileAttr := GetFileAttributes(PChar(filePath));
+
+      if processedPaths.IndexOf(filePath) >= 0 then
+      begin
+        Log('⚠️ Doppelter Eintrag ignoriert: ' + filePath);
+        Continue;
+      end;
+      processedPaths.Add(filePath);
+
+      // === WakeTime prüfen ===
+      if jsonObj.TryGetValue('wakeTime', wakeTimeStr) then
+      begin
+        try
+          wakeTime := ISO8601ToDate(wakeTimeStr, True);
+        except
+          Log('⚠️ Fehler beim Parsen von wakeTime: ' + wakeTimeStr);
+          Continue;
+        end;
+
+        // HideTime (optional, rein informativ)
+        if jsonObj.TryGetValue('hideTime', hideTimeStr) then
+        begin
+          try
+            hideTime := ISO8601ToDate(hideTimeStr, True);
+          except
+            hideTime := 0;
+          end;
+        end;
+
+        if Now >= wakeTime then
+        begin
+          if FileExists(filePath) then
+          begin
+            if (fileAttr and FILE_ATTRIBUTE_HIDDEN) <> 0 then
+            begin
+              SetFileAttributes(PChar(filePath), fileAttr and not FILE_ATTRIBUTE_HIDDEN);
+              Log('🌞 Datei geweckt: ' + filePath);
+              LastWokenFile := filePath;
+
+              if FormWake.mnuPlaySound.Checked then
+                PlayWakeupSound;
+
+              if (FormWake.mnuSnoozeEnabled.Checked) then
+              begin
+                var aFn := ExtractFileName(filePath);
+                if (Length(aFn) > 30) then
+                  aFn := LeftStr(aFn, 30) + ' ...';
+                FormToastF.ShowToast('Die Datei '+ aFn + ' ist aufgewacht.', 'Snooze verfügbar für 60 Sekunden');
+                FormWake.ShowBadgeIcon(60);
+              end;
+            end
+            else
+              Log('🔍 WakeTime erreicht, aber Datei war nicht versteckt: ' + filePath);
+          end
+          else
+            Log('❌ Datei bei WakeTime nicht gefunden: ' + filePath);
+
+          Log('🧹 Datei aus Liste entfernt (WakeTime erreicht): ' + filePath);
+          Continue;
+        end;
+      end;
+
+      // === Standardübernahme ===
+      newList.AddElement(jsonObj.Clone as TJSONValue);
+    end;
+
+    TFile.WriteAllText(jsonFile, newList.ToJSON);
+
+    processedPaths.Free;
+    jsonArr.Free;
+    newList.Free;
+  except
+    on E: Exception do
+      Log('💥 Fehler beim Verarbeiten von hidden_files.json: ' + E.Message);
+  end;
+end;
+
+procedure WakeAllFiles;
+var
+  jsonFile, jsonStr, filePath: string;
+  jsonArr, newList: TJSONArray;
+  jsonObj: TJSONObject;
+  fileAttr: DWORD;
+  i: Integer;
+begin
+  jsonFile := GetJsonFilePath;
+  if not TFile.Exists(jsonFile) then Exit;
+
+  try
+    jsonStr := TFile.ReadAllText(jsonFile);
+    jsonArr := TJSONObject.ParseJSONValue(jsonStr) as TJSONArray;
+    if not Assigned(jsonArr) then Exit;
+
+    newList := TJSONArray.Create;
+
+    for i := 0 to jsonArr.Count - 1 do
+    begin
+      jsonObj := jsonArr.Items[i] as TJSONObject;
+      filePath := jsonObj.GetValue('path').Value;
+      fileAttr := GetFileAttributes(PChar(filePath));
+
+      if TFile.Exists(filePath) then
+      begin
+        if (fileAttr and FILE_ATTRIBUTE_HIDDEN) <> 0 then
+        begin
+          PlayWakeupSound;
+          SetFileAttributes(PChar(filePath), fileAttr and not FILE_ATTRIBUTE_HIDDEN);
+          Log('🌞 Manuell aufgeweckt: ' + filePath);
+        end
+        else
+        begin
+          Log('📂 Datei war schon sichtbar: ' + filePath);
+        end;
+
+        // Status setzen (optional)
+        jsonObj.RemovePair('status');
+        jsonObj.AddPair('status', 'awake');
+
+        // Entscheidung: wieder beobachten oder nicht?
+        // Falls du sie vollständig löschen willst, Kommentar unten entfernen:
+        Continue;
+
+        newList.AddElement(jsonObj.Clone as TJSONValue);
+      end
+      else
+      begin
+        Log('❌ Datei nicht gefunden: ' + filePath);
+        // nicht übernehmen
+      end;
+    end;
+
+    TFile.WriteAllText(jsonFile, newList.ToJSON);
+
+    jsonArr.Free;
+    newList.Free;
+  except
+    on E: Exception do
+      Log('💥 Fehler bei WakeAllFiles: ' + E.Message);
+  end;
+  FormWake.LoadDefaultIcon;
+  ShwFiles.actReFreshExecute(nil);
+end;
+
+procedure LoadSettings;
+var
+  ini: TIniFile;
+begin
+  ini := TIniFile.Create(TPath.Combine(GetAppDataPath, 'settings.ini'));
+  try
+    WakeupSoundFile := ini.ReadString('Sound', 'WakeupSoundFile', '');
+    FormWake.mnuPlaySound.Checked := ini.ReadBool('Sound', 'PlayOnWake', False);
+    FormWake.Scannenaus1.Checked := ini.ReadBool('Options', 'ScanOff', False);
+    FormWake.mnuSnoozeEnabled.Checked := ini.ReadBool('Options', 'EnableSnooze', False);
+
+    ShwFiles.Left   := ini.ReadInteger('Window', 'ShwFiles.Left'  , ShwFiles.Left);
+    ShwFiles.Top    := ini.ReadInteger('Window', 'ShwFiles.Top'   , ShwFiles.Top);
+    ShwFiles.Width  := ini.ReadInteger('Window', 'ShwFiles.Width' , ShwFiles.Width);
+    ShwFiles.Height := ini.ReadInteger('Window', 'ShwFiles.Height', ShwFiles.Height);
+
+    FormWake.Left   := ini.ReadInteger('Window', 'FormWake.Left'  , FormWake.Left);
+    FormWake.Top    := ini.ReadInteger('Window', 'FormWake.Top'   , FormWake.Top);
+    FormWake.Width  := ini.ReadInteger('Window', 'FormWake.Width' , FormWake.Width);
+    FormWake.Height := ini.ReadInteger('Window', 'FormWake.Height', FormWake.Height);
+  finally
+    ini.Free;
+  end;
+
+  FormWake.Timer1.Enabled := not (FormWake.Scannenaus1.Checked);
+
+  if (FileExists(WakeupSoundFile)) then
+    FormWake.mnuPlaySound.Caption := 'Sound beim Aufwecken: ' + ExtractFileName(WakeupSoundFile)
+  else
+    FormWake.mnuPlaySound.Caption := 'Sound beim Aufwecken';
+end;
+
+procedure SaveSettings;
+var
+  ini: TIniFile;
+begin
+  ini := TIniFile.Create(TPath.Combine(GetAppDataPath, 'settings.ini'));
+  try
+    ini.WriteBool('Sound', 'PlayOnWake', FormWake.mnuPlaySound.Checked);
+    ini.WriteString('Sound', 'WakeupSoundFile', WakeupSoundFile);
+    ini.WriteBool('Options', 'ScanOff', FormWake.Scannenaus1.Checked);
+    ini.WriteBool('Options', 'EnableSnooze', FormWake.mnuSnoozeEnabled.Checked);
+
+    ini.WriteInteger('Window', 'ShwFiles.Left'  , ShwFiles.Left);
+    ini.WriteInteger('Window', 'ShwFiles.Top'   , ShwFiles.Top);
+    ini.WriteInteger('Window', 'ShwFiles.Width' , ShwFiles.Width);
+    ini.WriteInteger('Window', 'ShwFiles.Height', ShwFiles.Height);
+
+    ini.WriteInteger('Window', 'FormWake.Left'  , FormWake.Left);
+    ini.WriteInteger('Window', 'FormWake.Top'   , FormWake.Top);
+    ini.WriteInteger('Window', 'FormWake.Width' , FormWake.Width);
+    ini.WriteInteger('Window', 'FormWake.Height', FormWake.Height);
+  finally
+    ini.Free;
+  end;
+end;
+
+procedure TFormWake.CreateParams(var Params: TCreateParams);
+begin
+  inherited;
+  Params.ExStyle := Params.ExStyle or WS_EX_TOOLWINDOW; // kein Taskleisten-Button
+end;
+
+procedure TFormWake.FormCreate(Sender: TObject);
+begin
+  Application.ShowMainForm := False;
+  Self.Hide;
+
+  TrayIcon1.Icon.Assign(Application.Icon);
+  TrayIcon1.PopupMenu := PopupMenu1;
+  TrayIcon1.Visible := True;
+  Timer1.Enabled := True;
+end;
+
+procedure TFormWake.FormShow(Sender: TObject);
+begin
+  LoadSettings;
+end;
+
+procedure TFormWake.FormDestroy(Sender: TObject);
+begin
+  TrayIcon1.Visible := False;
+end;
+
+procedure TFormWake.Timer1Timer(Sender: TObject);
+begin
+  CheckAndWakeFiles;
+  if (ShwFiles.Visible) then
+    ShwFiles.actReFresh.Execute;
+end;
+
+procedure TFormWake.mnuSelectSoundClick(Sender: TObject);
+var
+  dlg: TOpenDialog;
+begin
+  dlg := TOpenDialog.Create(Self);
+  try
+    dlg.Filter := 'WAV-Dateien (*.wav)|*.wav';
+    if dlg.Execute then
+    begin
+      WakeupSoundFile := dlg.FileName;
+      Log('🔔 Sounddatei ausgewählt: ' + WakeupSoundFile);
+      SaveSettings; // gleich mit speichern
+      LoadSettings;
+    end;
+  finally
+    dlg.Free;
+  end;
+end;
+
+procedure TFormWake.actCheckNowExecute(Sender: TObject);
+begin
+  Timer1.Enabled := False;
+  CheckAndWakeFiles;
+    if (ShwFiles.Visible) then
+      ShwFiles.actReFresh.Execute;
+  Timer1.Enabled := True;
+end;
+
+procedure TFormWake.actWakeAllExecute(Sender: TObject);
+begin
+  WakeAllFiles;
+end;
+
+procedure TFormWake.actExitExecute(Sender: TObject);
+begin
+  SaveSettings;
+  Application.Terminate;
+end;
+
+procedure TFormWake.actShwFileShwExecute(Sender: TObject);
+begin
+  ShwFiles.ShowModal
+end;
+
+procedure TFormWake.LoadDefaultIcon;
+begin
+  SetTrayIconFromImageList(0);
+  TrayIcon1.Visible := False; // Refresh
+  TrayIcon1.Visible := True;
+  TrayIcon1.Hint := 'HiddenScheduler';
+  UpdateSnoozeMenuItems(False);
+end;
+
+procedure TFormWake.ShowBlueBadgeIcon(durationSecs: Integer = 60);
+var
+  thisSession: Integer;
+begin
+  SetTrayIconFromImageList(1); // Badge laden
+  TrayIcon1.Hint := 'WakeApp';
+  TrayIcon1.Visible := False;
+  TrayIcon1.Visible := True;
+end;
+
+procedure TFormWake.ShowRedBadgeIcon(durationSecs: Integer = 60);
+var
+  thisSession: Integer;
+begin
+  Inc(BadgeSessionID); // Neue Session-ID, alte Threads werden ignoriert
+  thisSession := BadgeSessionID;
+  Log('🆕 Neue Badge-Session: ' + thisSession.ToString);
+
+//  SnoozeActive := True;
+  SetTrayIconFromImageList(2); // Badge laden
+  TrayIcon1.Hint := 'Snooze aktiv – Optionen im Menü';
+  TrayIcon1.Visible := False;
+  TrayIcon1.Visible := True;
+  UpdateSnoozeMenuItems(True);
+
+  TThread.CreateAnonymousThread(procedure
+  begin
+    Sleep(durationSecs * 1000);
+    TThread.Synchronize(nil, procedure
+    begin
+      if thisSession = BadgeSessionID then
+      begin
+        Log('⏱ Snooze-Badge läuft ab – Standardicon wiederherstellen');
+        //SnoozeActive := False;
+        LoadDefaultIcon;
+      end
+      else
+        Log('⏩ Snooze-Badge vorzeitig ersetzt – Icon bleibt bestehen');
+    end);
+  end).Start;
+end;
+
+procedure TFormWake.mnuSnooze5Click(Sender: TObject);
+begin
+  Log('🔁 Schlummern: ' + LastWokenFile + ' für 5 Minuten');
+  DoSnooze(5); // Neue WakeTime setzen etc.
+  ShowBadgeIcon(60);
+end;
+
+procedure TFormWake.mnuSnooze15Click(Sender: TObject);
+begin
+  Log('🔁 Schlummern: ' + LastWokenFile + ' für 5 Minuten');
+  DoSnooze(15); // Neue WakeTime setzen etc.
+  ShowBadgeIcon(60);          // Neuer Badge → alte Session wird automatisch ersetzt
+end;
+
+procedure TFormWake.mnuSnooze60Click(Sender: TObject);
+begin
+  Log('🔁 Schlummern: ' + LastWokenFile + ' für 5 Minuten');
+  DoSnooze(60); // Neue WakeTime setzen etc.
+  ShowBadgeIcon(60);          // Neuer Badge → alte Session wird automatisch ersetzt
+end;
+
+procedure TFormWake.Scannenaus1Click(Sender: TObject);
+begin
+  SaveSettings;
+  LoadSettings;
+end;
+
+procedure TFormWake.TrayIcon1DblClick(Sender: TObject);
+begin
+  // Fenster anzeigen, falls minimiert oder versteckt
+  ShwFiles.Show;
+  ShwFiles.WindowState := wsNormal;
+  ShwFiles.BringToFront;
+end;
+
+procedure TFormWake.TrayIcon1MouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  if Button = mbLeft then
+  begin
+    // Fokus holen, falls notwendig
+    SetForegroundWindow(Handle);
+
+    // Menü anzeigen
+    if Button in [mbLeft, mbRight] then
+      TrayIcon1.PopupMenu.Popup(X, Y);
+  end;
+end;
+
+end.

@@ -1,0 +1,76 @@
+unit AppIconHostU;
+
+interface
+
+uses
+  Winapi.Windows, System.Classes, Vcl.Forms, Vcl.Graphics, Winapi.Messages;
+
+type
+  TFormAppIconHost = class(TForm)
+  private
+    procedure FormCreate(Sender: TObject);
+  public
+    //constructor Create(AOwner: TComponent); override;
+  protected
+    procedure WMSysCommand(var Msg: TWMSysCommand); message WM_SYSCOMMAND;
+  end;
+
+var
+  FormAppIconHost: TFormAppIconHost;
+
+implementation
+
+{$R *.dfm}
+
+uses ShwFilesU;
+
+{
+constructor TFormAppIconHost.Create(AOwner: TComponent);
+begin
+  inherited CreateNew(AOwner);
+
+  BorderStyle := bsNone;
+  SetBounds(-10000, -10000, 1, 1);
+
+  AlphaBlend := True;
+  AlphaBlendValue := 0; // Unsichtbar
+
+  Visible := True;
+  Show; // wichtig!
+
+  Icon := TIcon.Create;
+  Icon.LoadFromFile('C:\Tools\Sleep\IconWithBlueBadge0.ico'); // falls gewünscht
+
+  // NICHT verstecken – KEIN SW_HIDE
+end;
+}
+
+procedure TFormAppIconHost.FormCreate(Sender: TObject);
+begin
+  BorderStyle := bsNone;
+  SetBounds(-10000, -10000, 1, 1);  // völlig außerhalb des sichtbaren Bereichs
+  Icon.LoadFromFile('C:\Tools\Sleep\sleep.ico'); // oder per Ressourcen
+end;
+
+procedure TFormAppIconHost.WMSysCommand(var Msg: TWMSysCommand);
+begin
+  inherited;
+  if Msg.CmdType = SC_RESTORE then
+  begin
+    // App-Icon wurde geklickt (wenn minimiert) oder mit Alt+Tab ausgewählt
+    // Fenster "Dateien zeigen" anzeigen
+    if Assigned(ShwFiles) then
+    begin
+      ShwFiles.Show;
+      ShwFiles.BringToFront;
+      ShwFiles.SetFocus;
+    end
+    else
+    begin
+      if ShwFiles.WindowState = wsMinimized then
+        ShwFiles.WindowState := wsNormal;
+    end;
+  end;
+end;
+
+end.

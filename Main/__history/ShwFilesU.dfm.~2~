@@ -1,0 +1,108 @@
+object ShwFiles: TShwFiles
+  Left = 0
+  Top = 0
+  Caption = 'Dateien zeigen'
+  ClientHeight = 812
+  ClientWidth = 1812
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -24
+  Font.Name = 'Segoe UI'
+  Font.Style = []
+  OnCreate = FormCreate
+  OnShow = FormShow
+  PixelsPerInch = 192
+  DesignSize = (
+    1812
+    812)
+  TextHeight = 32
+  object btnSave: TButton
+    Left = 1476
+    Top = 135
+    Width = 300
+    Height = 100
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
+    Action = actSave
+    Anchors = [akTop, akRight]
+    TabOrder = 0
+    Visible = False
+  end
+  object btnReFresh: TButton
+    Left = 1476
+    Top = 17
+    Width = 300
+    Height = 100
+    Margins.Left = 12
+    Margins.Top = 12
+    Margins.Right = 12
+    Margins.Bottom = 12
+    Action = actReFresh
+    Anchors = [akTop, akRight]
+    TabOrder = 1
+  end
+  object btnWakeSelectedf: TButton
+    Left = 1476
+    Top = 270
+    Width = 300
+    Height = 100
+    Margins.Left = 12
+    Margins.Top = 12
+    Margins.Right = 12
+    Margins.Bottom = 12
+    Action = actWakeSelected
+    Anchors = [akTop, akRight]
+    TabOrder = 2
+    Visible = False
+  end
+  object ntnRemoveSelected: TButton
+    Left = 1476
+    Top = 394
+    Width = 300
+    Height = 100
+    Margins.Left = 12
+    Margins.Top = 12
+    Margins.Right = 12
+    Margins.Bottom = 12
+    Action = actRemoveSelected
+    Anchors = [akTop, akRight]
+    TabOrder = 3
+    Visible = False
+  end
+  object SGHiddenFiles: TStringGrid
+    Left = 0
+    Top = 10
+    Width = 1419
+    Height = 791
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
+    Anchors = [akLeft, akTop, akRight, akBottom]
+    DefaultColWidth = 128
+    DefaultRowHeight = 48
+    TabOrder = 4
+    OnSelectCell = SGHiddenFilesSelectCell
+    OnSetEditText = SGHiddenFilesSetEditText
+  end
+  object ActionList1: TActionList
+    Left = 1352
+    Top = 576
+    object actSave: TAction
+      Caption = 'Speichern'
+    end
+    object actReFresh: TAction
+      Caption = 'Refresh'
+      OnExecute = actReFreshExecute
+    end
+    object actWakeSelected: TAction
+      Caption = 'Ausgew'#228'hlte wecken'
+    end
+    object actRemoveSelected: TAction
+      Caption = 'Ausgew'#228'hlte entfernen'
+    end
+  end
+end

@@ -1,0 +1,16 @@
+program WakeHidden;
+
+uses
+  Vcl.Forms,
+  WakeHiddenU in 'WakeHiddenU.pas' {FormWake},
+  ShwFilesU in 'ShwFilesU.pas' {ShwFiles};
+
+{$R *.res}
+
+begin
+  Application.Initialize;
+  Application.MainFormOnTaskbar := True;
+  Application.CreateForm(TFormWake, FormWake);
+  Application.CreateForm(TShwFiles, ShwFiles);
+  Application.Run;
+end.

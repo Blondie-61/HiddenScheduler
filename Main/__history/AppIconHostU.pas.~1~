@@ -1,0 +1,40 @@
+unit AppIconHostU;
+
+interface
+
+uses
+  Winapi.Windows, System.Classes, Vcl.Forms, Vcl.Graphics;
+
+type
+  TFormAppIconHost = class(TForm)
+  public
+    constructor Create(AOwner: TComponent); override;
+  end;
+
+var
+  FormAppIconHost: TFormAppIconHost;
+
+implementation
+
+{$R *.dfm}
+
+constructor TFormAppIconHost.Create(AOwner: TComponent);
+begin
+  inherited CreateNew(AOwner);
+
+  BorderStyle := bsNone;
+  Width := 1;
+  Height := 1;
+  Left := -1000;
+  Top := -1000;
+  Visible := True;
+
+  // wichtig: eigene Taskbar-Repräsentation erzwingen
+  Application.MainFormOnTaskbar := False;
+  PopupMode := pmNone;
+
+  Icon := TIcon.Create;
+  ShowWindow(Handle, SW_HIDE); // kein sichtbares Fenster
+end;
+
+end.

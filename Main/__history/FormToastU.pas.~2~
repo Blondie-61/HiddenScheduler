@@ -1,0 +1,78 @@
+unit FormToastU;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls;
+
+type
+  TFormToastF = class(TForm)
+  lblTitle: TLabel;
+  lblMsg: TLabel;
+  btnSnooze5: TButton;
+  btnClose: TButton;
+  procedure btnSnooze5Click(Sender: TObject);
+  procedure btnCloseClick(Sender: TObject);
+  public
+    procedure ShowToast(const title, msg: string; durationMS: Integer = 5000);
+  end;
+
+var
+  FormToastF: TFormToastF;
+
+implementation
+
+{$R *.dfm}
+
+uses WakeHiddenU;
+
+procedure TFormToastF.ShowToast(const title, msg: string; durationMS: Integer);
+var
+  screenW, screenH: Integer;
+begin
+  lblTitle.Caption := title;
+  lblMsg.Caption := msg;
+
+  Width := 320;
+  Height := 100;
+
+  screenW := Screen.WorkAreaWidth;
+  screenH := Screen.WorkAreaHeight;
+
+  Left := screenW - Width - 10;
+  Top := screenH - Height - 10;
+
+  AlphaBlend := True;
+  AlphaBlendValue := 240;
+  BorderStyle := bsNone;
+  FormStyle := fsStayOnTop;
+
+  Show;
+
+  // Auto-Close
+  TThread.CreateAnonymousThread(procedure
+  begin
+    Sleep(durationMS);
+    TThread.Synchronize(nil, procedure
+    begin
+      if not Self.Focused then
+        Close;
+    end);
+  end).Start;
+end;
+
+procedure TFormToastF.btnSnooze5Click(Sender: TObject);
+begin
+  DoSnooze(5);
+  Close;
+end;
+
+procedure TFormToastF.btnCloseClick(Sender: TObject);
+begin
+  Close;
+end;
+
+end.
+
+end.

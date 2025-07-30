@@ -1,0 +1,15 @@
+object WakeTimeDialogF: TWakeTimeDialogF
+  Left = 0
+  Top = 0
+  Caption = 'WakeTimeDialogF'
+  ClientHeight = 1112
+  ClientWidth = 1568
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -30
+  Font.Name = 'Segoe UI'
+  Font.Style = []
+  PixelsPerInch = 240
+  TextHeight = 41
+end

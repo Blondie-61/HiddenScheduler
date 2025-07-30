@@ -1,0 +1,85 @@
+unit AppIconHostU;
+
+interface
+
+uses
+  Winapi.Windows, System.Classes, Vcl.Forms, Vcl.Graphics, Winapi.Messages,
+  Vcl.Controls;
+
+type
+  TFormAppIconHost = class(TForm)
+    procedure CreateParams(var Params: TCreateParams);
+    procedure FormCreate(Sender: TObject);
+  private
+    procedure WMActivate(var Msg: TWMActivate);
+  public
+  protected
+    procedure WMSysCommand(var Msg: TWMSysCommand); message WM_SYSCOMMAND;
+  end;
+
+var
+  FormAppIconHost: TFormAppIconHost;
+
+implementation
+
+{$R *.dfm}
+
+uses ShwFilesU;
+
+procedure TFormAppIconHost.CreateParams(var Params: TCreateParams);
+begin
+  inherited CreateParams(Params);
+  Params.ExStyle := Params.ExStyle or WS_EX_APPWINDOW;
+end;
+
+procedure TFormAppIconHost.FormCreate(Sender: TObject);
+begin
+  inherited;
+  BorderStyle := bsNone;
+  Width := 1;
+  Height := 1;
+
+  Left := Screen.DesktopWidth + 100; // weit außerhalb sichtbarem Bereich
+  Top := Screen.DesktopHeight + 100;
+
+  SetWindowPos(Handle, HWND_BOTTOM, Left, Top, Width, Height, SWP_NOACTIVATE or SWP_NOZORDER or SWP_SHOWWINDOW);
+end;
+
+procedure TFormAppIconHost.WMActivate(var Msg: TWMActivate);
+begin
+  inherited;
+
+  // Prüfen, ob das Fenster aktiviert wurde
+  if Msg.Active = WA_ACTIVE then
+  begin
+    if Assigned(ShwFiles) then
+    begin
+      ShwFiles.Show;
+      ShwFiles.BringToFront;
+      ShwFiles.SetFocus;
+    end;
+  end;
+end;
+
+procedure TFormAppIconHost.WMSysCommand(var Msg: TWMSysCommand);
+begin
+  inherited;
+  if Msg.CmdType = SC_RESTORE then
+  begin
+    // App-Icon wurde geklickt (wenn minimiert) oder mit Alt+Tab ausgewählt
+    // Fenster "Dateien zeigen" anzeigen
+    if Assigned(ShwFiles) then
+    begin
+      ShwFiles.Show;
+      ShwFiles.BringToFront;
+      ShwFiles.SetFocus;
+    end
+    else
+    begin
+      if ShwFiles.WindowState = wsMinimized then
+        ShwFiles.WindowState := wsNormal;
+    end;
+  end;
+end;
+
+end.

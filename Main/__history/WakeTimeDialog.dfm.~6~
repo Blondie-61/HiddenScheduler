@@ -1,0 +1,109 @@
+object frmWakeTimeDialog: TfrmWakeTimeDialog
+  Left = 0
+  Top = 0
+  BorderStyle = bsDialog
+  Caption = 'Aufweckzeit festlegen'
+  ClientHeight = 400
+  ClientWidth = 825
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -28
+  Font.Name = 'Segoe UI'
+  Font.Style = []
+  Position = poScreenCenter
+  PixelsPerInch = 240
+  TextHeight = 38
+  object lblPrompt: TLabel
+    Left = 40
+    Top = 40
+    Width = 412
+    Height = 38
+    Margins.Left = 8
+    Margins.Top = 8
+    Margins.Right = 8
+    Margins.Bottom = 8
+    Caption = 'Bitte Aufweckzeitpunkt festlegen:'
+  end
+  object dtWakeTime: TDateTimePicker
+    Left = 40
+    Top = 100
+    Width = 725
+    Height = 46
+    Margins.Left = 8
+    Margins.Top = 8
+    Margins.Right = 8
+    Margins.Bottom = 8
+    Date = 45263.000000000000000000
+    Time = 0.500000000000000000
+    Kind = dtkDateTime
+    TabOrder = 0
+  end
+  object btnPlus1h: TButton
+    Left = 40
+    Top = 180
+    Width = 225
+    Height = 63
+    Margins.Left = 8
+    Margins.Top = 8
+    Margins.Right = 8
+    Margins.Bottom = 8
+    Caption = '+1 Stunde'
+    TabOrder = 1
+    OnClick = btnPlus1hClick
+  end
+  object btnMorgen: TButton
+    Left = 290
+    Top = 180
+    Width = 225
+    Height = 63
+    Margins.Left = 8
+    Margins.Top = 8
+    Margins.Right = 8
+    Margins.Bottom = 8
+    Caption = 'Sa 14:00'
+    TabOrder = 2
+    OnClick = btnMorgenClick
+  end
+  object btnWochenende: TButton
+    Left = 540
+    Top = 180
+    Width = 225
+    Height = 63
+    Margins.Left = 8
+    Margins.Top = 8
+    Margins.Right = 8
+    Margins.Bottom = 8
+    Caption = 'Mo 08:00'
+    TabOrder = 3
+    OnClick = btnWochenendeClick
+  end
+  object btnOK: TButton
+    Left = 363
+    Top = 280
+    Width = 187
+    Height = 63
+    Margins.Left = 8
+    Margins.Top = 8
+    Margins.Right = 8
+    Margins.Bottom = 8
+    Caption = 'OK'
+    Default = True
+    ModalResult = 1
+    TabOrder = 4
+  end
+  object btnCancel: TButton
+    Left = 578
+    Top = 280
+    Width = 187
+    Height = 63
+    Margins.Left = 8
+    Margins.Top = 8
+    Margins.Right = 8
+    Margins.Bottom = 8
+    Cancel = True
+    Caption = 'Abbrechen'
+    ModalResult = 2
+    TabOrder = 5
+  end
+end

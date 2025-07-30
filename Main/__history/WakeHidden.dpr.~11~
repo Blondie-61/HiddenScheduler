@@ -1,0 +1,44 @@
+﻿program WakeHidden;
+
+uses
+  Vcl.Forms,
+  IniFiles,
+  System.IOUtils,
+  System.SysUtils,
+  WakeHiddenU in 'WakeHiddenU.pas' {FormWake},
+  ShwFilesU in 'ShwFilesU.pas' {ShwFiles},
+  FormToastU in 'FormToastU.pas' {FormToastF},
+  AppIconHostU in 'AppIconHostU.pas' {FormAppIconHost};
+
+{$R *.res}
+  function TaskbarIconEnabled: Boolean;
+  var
+    ini: TIniFile;
+  begin
+    ini := TIniFile.Create(TPath.Combine(GetAppDataPath, 'settings.ini'));
+    try
+      Result := ini.ReadBool('Options', 'ShowInTaskbar', True); // Default: aktiv
+    finally
+      ini.Free;
+    end;
+  end;
+
+begin
+  Application.Initialize;
+
+  // ⚠️ NICHT sofort true setzen
+  Application.MainFormOnTaskbar := TaskbarIconEnabled;
+
+  if TaskbarIconEnabled then
+    Application.CreateForm(TFormAppIconHost, FormAppIconHost);
+
+  Application.CreateForm(TFormWake, FormWake);
+  Application.CreateForm(TShwFiles, ShwFiles);
+  Application.CreateForm(TFormToastF, FormToastF);
+
+  // Falls kein TaskbarIcon gewünscht → AppIconHost nicht erzeugt → wir setzen anderes MainForm
+  if not TaskbarIconEnabled then
+    Application.MainForm := FormWake; // oder nil, wenn du kein sichtbares MainForm brauchst
+
+  Application.Run;
+end.

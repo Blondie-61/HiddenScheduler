@@ -1,0 +1,65 @@
+unit AppIconHostU;
+
+interface
+
+uses
+  Winapi.Windows, System.Classes, Vcl.Forms, Vcl.Graphics, Winapi.Messages;
+
+type
+  TFormAppIconHost = class(TForm)
+  public
+    constructor Create(AOwner: TComponent); override;
+  protected
+    procedure WMSysCommand(var Msg: TWMSysCommand); message WM_SYSCOMMAND;
+  end;
+
+var
+  FormAppIconHost: TFormAppIconHost;
+
+implementation
+
+{$R *.dfm}
+
+uses ShwFilesU;
+
+constructor TFormAppIconHost.Create(AOwner: TComponent);
+begin
+  inherited CreateNew(AOwner);
+
+  BorderStyle := bsNone;
+  Width := 1;
+  Height := 1;
+  Left := -1000;
+  Top := -1000;
+  Visible := True;
+
+  // wichtig: eigene Taskbar-Repräsentation erzwingen
+  Application.MainFormOnTaskbar := False;
+  PopupMode := pmNone;
+
+  Icon := TIcon.Create;
+  ShowWindow(Handle, SW_HIDE); // kein sichtbares Fenster
+end;
+
+procedure TFormAppIconHost.WMSysCommand(var Msg: TWMSysCommand);
+begin
+  inherited;
+  if Msg.CmdType = SC_RESTORE then
+  begin
+    // App-Icon wurde geklickt (wenn minimiert) oder mit Alt+Tab ausgewählt
+    // Fenster "Dateien zeigen" anzeigen
+    if Assigned(ShwFiles) then
+    begin
+      ShwFiles.Show;
+      ShwFiles.BringToFront;
+      ShwFiles.SetFocus;
+    end
+    else
+    begin
+      if ShwFiles.WindowState = wsMinimized then
+        ShwFiles.WindowState := wsNormal;
+    end;
+  end;
+end;
+
+end.

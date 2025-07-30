@@ -1,0 +1,61 @@
+object FormToastF: TFormToastF
+  Left = 0
+  Top = 0
+  Caption = 'FormToastF'
+  ClientHeight = 889
+  ClientWidth = 1254
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -24
+  Font.Name = 'Segoe UI'
+  Font.Style = []
+  PixelsPerInch = 192
+  TextHeight = 32
+  object lblTitel: TLabel
+    Left = 48
+    Top = 48
+    Width = 72
+    Height = 32
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
+    Caption = 'lblTitel'
+  end
+  object lblMsg: TLabel
+    Left = 48
+    Top = 92
+    Width = 72
+    Height = 32
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
+    Caption = 'lblMsg'
+  end
+  object btnSnooze5: TButton
+    Left = 32
+    Top = 176
+    Width = 150
+    Height = 50
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
+    Caption = 'btnSnooze5'
+    TabOrder = 0
+  end
+  object Close: TButton
+    Left = 288
+    Top = 176
+    Width = 150
+    Height = 50
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
+    Caption = 'Close'
+    TabOrder = 1
+  end
+end
