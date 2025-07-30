@@ -1,0 +1,30 @@
+# Delphi generierte Verzeichnisse
+__history/
+Win32/
+x64/
+__recovery/
+.dcu/
+.dcp/
+
+# Backup-Dateien
+*.~*
+*.bak
+*.tmp
+
+# Projektkonfiguration
+*.identcache
+*.local
+*.tvsconfig
+*.dsk
+*.stat
+*.dproj.*
+*.groupproj.*
+
+# Sonstiges
+*.log
+.svn/
+
+# Windows
+Thumbs.db
+desktop.ini
+
