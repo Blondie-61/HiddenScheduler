@@ -55,8 +55,6 @@ Das Projekt wurde erstellt mit **Delphi 11.3 Alexandria**.
 
 ## 🚧 Roadmap
 
-## 🚧 Roadmap
-
 ### ✅ Version 1.0.0 (veröffentlicht)
 - Kontextmenü „Schlafen …“ mit festen Zeitoptionen
 - Tray-Programm zur automatischen Reaktivierung
