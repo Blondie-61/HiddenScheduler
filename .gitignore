@@ -24,6 +24,11 @@ __recovery/
 *.log
 .svn/
 
+# Github Dateien und Verzeichnisse, falls verwendet
+bin/
+output/
+.gitignore
+
 # Windows
 Thumbs.db
 desktop.ini
