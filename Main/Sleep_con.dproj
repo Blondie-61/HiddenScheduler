@@ -86,12 +86,17 @@
         <DCC_RemoteDebug>false</DCC_RemoteDebug>
         <Debugger_RunParams>Test.txt z_individuell</Debugger_RunParams>
         <Debugger_CWD>C:\Tools</Debugger_CWD>
-        <VerInfo_Locale>1033</VerInfo_Locale>
+        <VerInfo_Locale>1031</VerInfo_Locale>
         <Manifest_File>(Ohne)</Manifest_File>
         <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
         <Icon_MainIcon>Sleep_con_Icon1.ico</Icon_MainIcon>
         <UWP_DelphiLogo44>..\Resourcen\sleep.png</UWP_DelphiLogo44>
         <UWP_DelphiLogo150>..\Resourcen\sleep.png</UWP_DelphiLogo150>
+        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
+        <VerInfo_Build>13</VerInfo_Build>
+        <VerInfo_Keys>CompanyName=Gerhard Waldhelm;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.13;InternalName=Sleep;LegalCopyright=2025;LegalTrademarks=;OriginalFilename=sleep.exe;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=Benötigt WakeHidden</VerInfo_Keys>
+        <VerInfo_Debug>true</VerInfo_Debug>
+        <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
         <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
@@ -103,6 +108,10 @@
         <VerInfo_Locale>1033</VerInfo_Locale>
         <Manifest_File>(Ohne)</Manifest_File>
         <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
+        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
+        <VerInfo_Build>12</VerInfo_Build>
+        <VerInfo_Keys>CompanyName=Gerhard Waldhelm;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.12;InternalName=;LegalCopyright=2025;LegalTrademarks=;OriginalFilename=sleep.exe;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=benötigt WakeHidden</VerInfo_Keys>
+        <Icon_MainIcon>Sleep_con_Icon1.ico</Icon_MainIcon>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">

@@ -5,7 +5,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ExtCtrls, System.ImageList, Vcl.ImgList, System.Actions, Vcl.ActnList, Vcl.Menus,
-  System.IOUtils, System.JSON, System.DateUtils, System.IniFiles, MMSystem, Winapi.CommCtrl, StrUtils,
+  System.IOUtils, System.JSON, System.DateUtils, System.IniFiles, MMSystem, Winapi.CommCtrl, StrUtils, Registry,
   System.Types, VirtualTrees.Types;
 type
   TTrayIconState = (tisDefault, tisBlue, tisRed);
@@ -36,12 +36,9 @@ type
     mnuSnooze5: TMenuItem;
     mnuSnooze15: TMenuItem;
     mnuSnooze60: TMenuItem;
-    PopupMenuSnooze: TPopupMenu;
-    Snooze5Min1: TMenuItem;
-    Snooze15Minuten1: TMenuItem;
-    Snooze15Minuten2: TMenuItem;
     SchlummernDialog1: TMenuItem;
     Taskleistensymbol1: TMenuItem;
+    chkAutostart: TMenuItem;
 
     procedure FormCreate(Sender: TObject);
     procedure FormShow(Sender: TObject);
@@ -51,6 +48,7 @@ type
     procedure actWakeAllExecute(Sender: TObject);
     procedure actExitExecute(Sender: TObject);
     procedure actShwFileShwExecute(Sender: TObject);
+    procedure chkAutostartClick(Sender: TObject);
 
     procedure mnuSelectSoundClick(Sender: TObject);
     procedure mnuSnooze15Click(Sender: TObject);
@@ -81,7 +79,7 @@ var
   BadgeSessionID: Integer = 0;
   CurrentTrayState: TTrayIconState = tisDefault;
   iNumberOfFiles: Integer = 0;
-  ENABLE_LOGGING: Boolean = True;
+  ENABLE_LOGGING: Boolean = False;
 
 function TaskbarIconEnabled: Boolean;
 function GetAppDataPath: string;
@@ -617,6 +615,27 @@ begin
   ShwFiles.actReFreshExecute(nil);
 end;
 
+procedure UpdateAutoStart(enable: Boolean);
+const
+  RegPath = 'Software\Microsoft\Windows\CurrentVersion\Run';
+var
+  reg: TRegistry;
+begin
+  reg := TRegistry.Create;
+  try
+    reg.RootKey := HKEY_CURRENT_USER;
+    if reg.OpenKey(RegPath, True) then
+    begin
+      if enable then
+        reg.WriteString('HiddenScheduler', Application.ExeName)
+      else
+        reg.DeleteValue('HiddenScheduler');
+    end;
+  finally
+    reg.Free;
+  end;
+end;
+
 procedure LoadSettings;
 var
   ini: TIniFile;
@@ -630,7 +649,8 @@ begin
     FormWake.Scannenaus1.Checked := ini.ReadBool('Options', 'ScanOff', False);
     FormWake.mnuSnoozeEnabled.Checked := ini.ReadBool('Options', 'EnableSnooze', False);
     FormWake.SchlummernDialog1.Checked := ini.ReadBool('Options', 'SnoozeDialog', True);
-    FormWake.Taskleistensymbol1.Checked := ini.ReadBool('Options', 'ShowInTaskbar', True); // Default: aktiv
+    FormWake.Taskleistensymbol1.Checked := ini.ReadBool('Options', 'ShowInTaskbar', True);
+    FormWake.chkAutostart.Checked := ini.ReadBool('Options', 'AutoStart', False);
 
     ShwFiles.Left   := ini.ReadInteger('Window', 'ShwFiles.Left'  , ShwFiles.Left);
     ShwFiles.Top    := ini.ReadInteger('Window', 'ShwFiles.Top'   , ShwFiles.Top);
@@ -640,7 +660,7 @@ begin
     for var i := 0 to ShwFiles.VST.Header.Columns.Count - 1 do
       ShwFiles.VST.Header.Columns[i].Width := ini.ReadInteger('Columns', Format('Col%d.Width', [i]), ShwFiles.VST.Header.Columns[i].Width);
 
-    ShwFiles.VST.Header.SortColumn := ini.ReadInteger('Columns', 'SortColumn', 1); // Default: Dateiname
+    ShwFiles.VST.Header.SortColumn := ini.ReadInteger('Columns', 'SortColumn', 1);
     ShwFiles.VST.Header.SortDirection := TSortDirection(ini.ReadInteger('Columns', 'SortDirection', Ord(sdAscending)));
 
     ShwFiles.VST.SortTree(
@@ -674,6 +694,7 @@ begin
     ini.WriteBool('Options', 'ScanOff', FormWake.Scannenaus1.Checked);
     ini.WriteBool('Options', 'EnableSnooze', FormWake.mnuSnoozeEnabled.Checked);
     ini.WriteBool('Options', 'SnoozeDialog', FormWake.SchlummernDialog1.Checked);
+    ini.WriteBool('Options', 'AutoStart', FormWake.chkAutostart.Checked);
 
     ini.WriteInteger('Window', 'ShwFiles.Left'  , ShwFiles.Left);
     ini.WriteInteger('Window', 'ShwFiles.Top'   , ShwFiles.Top);
@@ -770,6 +791,11 @@ procedure TFormWake.actShwFileShwExecute(Sender: TObject);
 begin
   ShwFiles.WindowState := wsNormal;
   ShwFiles.Show;
+end;
+
+procedure TFormWake.chkAutostartClick(Sender: TObject);
+begin
+  UpdateAutoStart(chkAutostart.Checked);
 end;
 
 procedure TFormWake.LoadDefaultIcon;

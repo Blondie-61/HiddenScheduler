@@ -59,6 +59,11 @@ object FormWake: TFormWake
       Checked = True
       OnClick = Taskleistensymbol1Click
     end
+    object chkAutostart: TMenuItem
+      AutoCheck = True
+      Caption = 'Mit Windows starten'
+      OnClick = chkAutostartClick
+    end
     object Scannenaus1: TMenuItem
       AutoCheck = True
       Caption = 'automatisch Wecken aus'
@@ -263,21 +268,5 @@ object FormWake: TFormWake
     OnMouseUp = TrayIcon1MouseUp
     Left = 560
     Top = 304
-  end
-  object PopupMenuSnooze: TPopupMenu
-    Left = 400
-    Top = 176
-    object Snooze5Min1: TMenuItem
-      Caption = 'Snooze 5 Minuten'
-      OnClick = mnuSnooze5Click
-    end
-    object Snooze15Minuten1: TMenuItem
-      Caption = 'Snooze 15 Minuten'
-      OnClick = mnuSnooze15Click
-    end
-    object Snooze15Minuten2: TMenuItem
-      Caption = 'Snooze 60 Minuten'
-      OnClick = mnuSnooze60Click
-    end
   end
 end
