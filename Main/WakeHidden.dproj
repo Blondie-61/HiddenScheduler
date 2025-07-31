@@ -126,6 +126,7 @@
             <Form>FormAppIconHost</Form>
             <FormType>dfm</FormType>
         </DCCReference>
+        <DCCReference Include="UpdateChecker.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

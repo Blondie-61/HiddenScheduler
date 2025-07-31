@@ -8,7 +8,8 @@ uses
   WakeHiddenU in 'WakeHiddenU.pas' {FormWake},
   ShwFilesU in 'ShwFilesU.pas' {ShwFiles},
   FormToastU in 'FormToastU.pas' {FormToastF},
-  AppIconHostU in 'AppIconHostU.pas' {FormAppIconHost};
+  AppIconHostU in 'AppIconHostU.pas' {FormAppIconHost},
+  UpdateChecker in 'UpdateChecker.pas';
 
 {$R *.res}
 //  function TaskbarIconEnabled: Boolean;
@@ -29,7 +30,8 @@ begin
   if TaskbarIconEnabled then
   begin
     Application.MainFormOnTaskbar := True;
-    Application.CreateForm(TShwFiles, ShwFiles); // sichtbar in Taskbar
+    Application.CreateForm(TShwFiles, ShwFiles);
+  // sichtbar in Taskbar
   end
   else
   begin
