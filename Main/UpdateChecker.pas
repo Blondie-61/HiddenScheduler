@@ -1,4 +1,4 @@
-unit UpdateChecker;
+﻿unit UpdateChecker;
 
 interface
 
@@ -13,6 +13,7 @@ type
     IsNewer: Boolean;
   end;
 
+function GetAppVersion: string;
 function CheckForUpdate(const CurrentVersion: string; out Info: TUpdateInfo): Boolean;
 
 implementation
@@ -20,7 +21,7 @@ implementation
 uses
   System.Net.URLClient, System.NetConsts;
 
-function strBuildInfo: string;
+function GetAppVersion: string;
 var
   V1, V2, V3, V4: word;
 
@@ -47,7 +48,9 @@ var
 
 begin
   GetBuildInfo(V1, V2, V3, V4);
-  result := IntToStr(V1) + '.' + IntToStr(V2) + '.' + IntToStr(V3) + '.' + IntToStr(V4);
+//  Result := IntToStr(V1) + '.' + IntToStr(V2) + '.' + IntToStr(V3) + '.' + IntToStr(V4);
+  Result := IntToStr(V1) + '.' + IntToStr(V2) + '.' + IntToStr(V3);
+  Result := '1.0.0';
 end;
 
 function NormalizeVersion(const Version: string): string;
@@ -68,33 +71,51 @@ var
   assets: TJSONArray;
   asset: TJSONObject;
   i: Integer;
+  releaseTag, releaseBody, downloadUrl: string;
 begin
   Result := False;
   FillChar(Info, SizeOf(Info), 0);
 
   client := THttpClient.Create;
   try
+    // Abfrage über die GitHub-API
     response := client.Get('https://api.github.com/repos/Blondie-61/HiddenScheduler/releases/latest');
 
     if response.StatusCode = 200 then
     begin
       json := TJSONObject.ParseJSONValue(response.ContentAsString()) as TJSONObject;
       try
-        Info.TagName := json.GetValue<string>('tag_name');
-        Info.ReleaseNotes := json.GetValue<string>('body');
-        Info.IsNewer := IsVersionNewer(CurrentVersion, Info.TagName);
+        releaseTag := json.GetValue<string>('tag_name');
+        releaseBody := json.GetValue<string>('body');
 
-        if json.TryGetValue('assets', assets) then
+        Info.TagName := releaseTag;
+        Info.ReleaseNotes := releaseBody;
+        Info.IsNewer := IsVersionNewer(CurrentVersion, releaseTag);
+
+        // Nach bestimmtem Asset suchen (Setup-Datei)
+        if json.TryGetValue<TJSONArray>('assets', assets) then
         begin
           for i := 0 to assets.Count - 1 do
           begin
             asset := assets.Items[i] as TJSONObject;
-            if asset.GetValue<string>('name').ToLower = 'setup.exe' then
+
+            // Hier musst Du den echten Dateinamen eintragen:
+            if asset.GetValue<string>('name').ToLower = 'wakehiddensetup.exe' then
             begin
-              Info.DownloadURL := asset.GetValue<string>('browser_download_url');
+              downloadUrl := asset.GetValue<string>('browser_download_url');
+              Info.DownloadURL := downloadUrl;
               Break;
             end;
           end;
+        end;
+
+        // Falls keine URL gefunden wurde → generischen Download-Link versuchen
+        if Info.DownloadURL = '' then
+        begin
+          Info.DownloadURL := Format(
+            'https://github.com/Blondie-61/HiddenScheduler/releases/download/%s/WakeHiddenSetup.exe',
+            [releaseTag]
+          );
         end;
 
         Result := Info.IsNewer;

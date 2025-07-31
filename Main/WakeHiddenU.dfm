@@ -3,19 +3,19 @@ object FormWake: TFormWake
   Top = 549
   BorderStyle = bsNone
   Caption = 'FormWake'
-  ClientHeight = 726
-  ClientWidth = 1268
+  ClientHeight = 908
+  ClientWidth = 1585
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
-  Font.Height = -24
+  Font.Height = -30
   Font.Name = 'Segoe UI'
   Font.Style = []
   Position = poDesigned
   OnCreate = FormCreate
   OnShow = FormShow
-  PixelsPerInch = 192
-  TextHeight = 32
+  PixelsPerInch = 240
+  TextHeight = 41
   object Timer1: TTimer
     Interval = 15000
     OnTimer = Timer1Timer
@@ -93,6 +93,10 @@ object FormWake: TFormWake
     end
     object N2: TMenuItem
       Caption = '-'
+    end
+    object nachneuerVersionsuchen1: TMenuItem
+      Caption = 'nach neurerer Version suchen ...'
+      OnClick = nachneuerVersionsuchen1Click
     end
     object Beenden1: TMenuItem
       Action = actExit
