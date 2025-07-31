@@ -22,7 +22,6 @@ Dateien werden für eine bestimmte Zeit unsichtbar gemacht und automatisch wiede
 - Setup inklusive:
   - Uninstaller
   - Optionalem Autostart des Tray-Tools (`WakeHidden.exe`)
-  - Unterstützung für Silent-Installation (`/silent`, `/verysilent`)
 
 ---
 
@@ -66,7 +65,8 @@ Das Projekt wurde erstellt mit **Delphi 11.3 Alexandria**.
 - Autostart-Option im Programm (konfigurierbar)
 - Integrierte Update-Funktion im Tray-Tool
 - Erweiterte Tray-Optionen (z. B. „Jetzt alles aufwecken“)
-
+  - Unterstützung für Silent-Installation (`/silent`, `/verysilent`)
+    
 ### 🧪 Ideen für spätere Versionen
 - Option: Verstecken nur, wenn Datei älter als X Minuten
 - Unterstützung für Ordner
