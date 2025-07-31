@@ -16,12 +16,13 @@ Dateien werden für eine bestimmte Zeit unsichtbar gemacht und automatisch wiede
 - Versteckt Dateien mit einem Rechtsklick („Schlafen …“) für:
   - 1h, 2h, 4h
   - Bis morgen früh
-  - Bis zum Wochenende
-  - Oder eine benutzerdefinierte Zeit
-- Automatisches Wiederherstellen zur gewünschten Zeit über das Tray-Tool `WakeHidden.exe`
-- Kontextmenü-Integration über Registry
-- Optionaler Autostart des Tray-Programms
-- Setup mit Uninstaller und Silent-Install-Modus
+  - Am Wochenende
+  - Oder benutzerdefiniert
+- Automatisches Wiederherstellen durch das Tray-Tool `WakeHidden.exe`
+- Setup inklusive:
+  - Uninstaller
+  - Optionalem Autostart des Tray-Tools (`WakeHidden.exe`)
+  - Unterstützung für Silent-Installation (`/silent`, `/verysilent`)
 
 ---
 
@@ -54,17 +55,19 @@ Das Projekt wurde erstellt mit **Delphi 11.3 Alexandria**.
 
 ## 🚧 Roadmap
 
-### ✅ Version 1.0.0 (veröffentlicht)
-- Kontextmenü für „Schlafen …“ mit festen Zeitoptionen
-- Tray-Programm zur Rückkehr der Dateien
-- Autostart & Setup mit Uninstaller
-- Silent-Install und Registry-Einträge
+## 🚧 Roadmap
 
-### 🛠 Geplant für 1.1.0
-- Automatischer Start des Hauptprogramms nach Setup
-- Auto-Update-Funktion im Tray-Tool
-- Kontextmenü-Integration über Setup optional konfigurierbar
-- Tray-Option: „Jetzt alle Dateien aufwecken“
+### ✅ Version 1.0.0 (veröffentlicht)
+- Kontextmenü „Schlafen …“ mit festen Zeitoptionen
+- Tray-Programm zur automatischen Reaktivierung
+- Setup mit Uninstaller
+- Optionaler Autostart des Tray-Tools (über Setup-Task)
+- Silent-Installer (Setup selbst, **nicht** Programmfunktionen)
+
+### 🛠 Geplant für Version 1.1.0
+- Autostart-Option im Programm (konfigurierbar)
+- Integrierte Update-Funktion im Tray-Tool
+- Erweiterte Tray-Optionen (z. B. „Jetzt alles aufwecken“)
 
 ### 🧪 Ideen für spätere Versionen
 - Option: Verstecken nur, wenn Datei älter als X Minuten
