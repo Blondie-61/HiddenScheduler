@@ -1,6 +1,8 @@
+; === SleepSetup_v1.1.0.iss ===
+
 [Setup]
 AppName=Sleep Tool
-AppVersion=1.0.0.58
+AppVersion=1.1.0
 AppPublisher=BlondieSoft
 DefaultDirName=C:\Tools\Sleep
 DisableProgramGroupPage=yes
@@ -10,9 +12,9 @@ OutputBaseFilename=SleepSetup
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=admin
-VersionInfoVersion=1.0.0
-VersionInfoTextVersion=1.0.0
-VersionInfoProductVersion=1.0.0
+VersionInfoVersion=1.1.0
+VersionInfoTextVersion=1.1.0
+VersionInfoProductVersion=1.1.0
 
 [Files]
 Source: "Sleep.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -76,8 +78,10 @@ Filename: "{app}\WakeHidden.exe"; Description: "Sleep jetzt starten"; Flags: now
 [Code]
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
-  if CurStep = ssPostInstall then begin
-    if WizardIsTaskSelected('autostart') then begin
+  if CurStep = ssPostInstall then
+  begin
+    if WizardIsTaskSelected('autostart') then
+    begin
       RegWriteStringValue(HKEY_CURRENT_USER,
         'Software\Microsoft\Windows\CurrentVersion\Run',
         'SleepTray',
