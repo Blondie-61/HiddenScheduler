@@ -87,7 +87,7 @@ begin
   GetBuildInfo(V1, V2, V3, V4);
 //  Result := IntToStr(V1) + '.' + IntToStr(V2) + '.' + IntToStr(V3) + '.' + IntToStr(V4);
   Result := IntToStr(V1) + '.' + IntToStr(V2) + '.' + IntToStr(V3);
-  Result := '1.0.0';
+//  Result := '1.0.0';
 end;
 
 function NormalizeVersion(const Version: string): string;
