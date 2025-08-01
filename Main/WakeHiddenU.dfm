@@ -3,19 +3,19 @@ object FormWake: TFormWake
   Top = 549
   BorderStyle = bsNone
   Caption = 'FormWake'
-  ClientHeight = 908
-  ClientWidth = 1585
+  ClientHeight = 732
+  ClientWidth = 1329
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
-  Font.Height = -30
+  Font.Height = -24
   Font.Name = 'Segoe UI'
   Font.Style = []
   Position = poDesigned
   OnCreate = FormCreate
   OnShow = FormShow
-  PixelsPerInch = 240
-  TextHeight = 41
+  PixelsPerInch = 192
+  TextHeight = 32
   object Timer1: TTimer
     Interval = 15000
     OnTimer = Timer1Timer
@@ -23,8 +23,8 @@ object FormWake: TFormWake
     Top = 80
   end
   object PopupMenu1: TPopupMenu
-    Left = 288
-    Top = 368
+    Left = 304
+    Top = 336
     object ZeigeDateien1: TMenuItem
       Action = actShwFileShw
     end
@@ -123,8 +123,8 @@ object FormWake: TFormWake
     end
   end
   object ImageListWithBadge: TImageList
-    Left = 550
-    Top = 395
+    Left = 700
+    Top = 70
     Bitmap = {
       494C010103000800040010001000FFFFFFFFFF10FFFFFFFFFFFFFFFF424D3600
       0000000000003600000028000000400000001000000001002000000000000010

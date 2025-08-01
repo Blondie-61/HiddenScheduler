@@ -3,7 +3,7 @@
 interface
 
 uses
-  System.SysUtils, Net.HttpClient, Winapi.Windows, System.JSON;
+  System.SysUtils, Net.HttpClient, Winapi.Windows, Winapi.ShellAPI, System.JSON;
 
 type
   TUpdateInfo = record
@@ -13,13 +13,50 @@ type
     IsNewer: Boolean;
   end;
 
+function SimplifyMarkdownForGitHub(const md: string): string;
+procedure OpenURL(const URL: string);
 function GetAppVersion: string;
 function CheckForUpdate(const CurrentVersion: string; out Info: TUpdateInfo): Boolean;
 
 implementation
 
-uses
-  System.Net.URLClient, System.NetConsts;
+function SimplifyMarkdownForGitHub(const md: string): string;
+var
+  s: string;
+begin
+  s := md;
+
+  // --- Checkboxen ---
+  s := StringReplace(s, '[x]', '✅', [rfReplaceAll, rfIgnoreCase]);
+  s := StringReplace(s, '[ ]', '⬜️', [rfReplaceAll, rfIgnoreCase]);
+
+  // --- Emojis ---
+  s := StringReplace(s, ':rocket:', '🚀', [rfReplaceAll, rfIgnoreCase]);
+  s := StringReplace(s, ':wrench:', '🔧', [rfReplaceAll, rfIgnoreCase]);
+  s := StringReplace(s, ':package:', '📦', [rfReplaceAll, rfIgnoreCase]);
+  s := StringReplace(s, ':bug:', '🐞', [rfReplaceAll, rfIgnoreCase]);
+  s := StringReplace(s, ':zap:', '⚡', [rfReplaceAll, rfIgnoreCase]);
+  s := StringReplace(s, ':memo:', '📝', [rfReplaceAll, rfIgnoreCase]);
+
+  // --- Fett-Schrift entfernen ---
+  s := StringReplace(s, '**', '', [rfReplaceAll]);
+
+  // --- Markdown-Header ##
+  s := StringReplace(s, '## ', '', [rfReplaceAll]);
+
+  // --- Trennlinien (---) entfernen
+  s := StringReplace(s, '---', '', [rfReplaceAll]);
+
+  // --- Leerzeilen am Ende abschneiden ---
+  s := Trim(s);
+
+  Result := s;
+end;
+
+procedure OpenURL(const URL: string);
+begin
+  ShellExecute(0, 'open', PChar(URL), nil, nil, SW_SHOWNORMAL);
+end;
 
 function GetAppVersion: string;
 var

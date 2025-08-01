@@ -24,6 +24,10 @@ __recovery/
 *.log
 .svn/
 
+# Setup-Verzeichnis ignorieren, aber .iss-Dateien behalten
+/setup/*
+!/setup/*.iss
+
 # Github Dateien und Verzeichnisse, falls verwendet
 bin/
 output/

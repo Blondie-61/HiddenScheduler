@@ -3,7 +3,7 @@
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics, WinAPI.ShellAPI,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ExtCtrls, System.ImageList, Vcl.ImgList, System.Actions, Vcl.ActnList, Vcl.Menus,
   System.IOUtils, System.JSON, System.DateUtils, System.IniFiles, MMSystem, Winapi.CommCtrl, StrUtils, Registry,
   System.Types, VirtualTrees.Types;
@@ -54,6 +54,7 @@ type
     procedure mnuSnooze15Click(Sender: TObject);
     procedure mnuSnooze5Click(Sender: TObject);
     procedure mnuSnooze60Click(Sender: TObject);
+    procedure nachneuerVersionsuchen1Click(Sender: TObject);
     procedure Scannenaus1Click(Sender: TObject);
     procedure Taskleistensymbol1Click(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
@@ -97,7 +98,7 @@ implementation
 {$R *.dfm}
 {$R WakeHidden.res}
 
-uses ShwFilesU, FormToastU;
+uses ShwFilesU, FormToastU, UpdateChecker;
 
 function TaskbarIconEnabled: Boolean;
 var
@@ -639,6 +640,7 @@ end;
 procedure LoadSettings;
 var
   ini: TIniFile;
+  autoStartRegSet: Boolean;
 begin
   ini := TIniFile.Create(TPath.Combine(GetAppDataPath, 'settings.ini'));
   try
@@ -650,7 +652,19 @@ begin
     FormWake.mnuSnoozeEnabled.Checked := ini.ReadBool('Options', 'EnableSnooze', False);
     FormWake.SchlummernDialog1.Checked := ini.ReadBool('Options', 'SnoozeDialog', True);
     FormWake.Taskleistensymbol1.Checked := ini.ReadBool('Options', 'ShowInTaskbar', True);
-    FormWake.chkAutostart.Checked := ini.ReadBool('Options', 'AutoStart', False);
+
+    // Autostart aus Registry lesen
+    var reg := TRegistry.Create(KEY_READ);
+    try
+      reg.RootKey := HKEY_CURRENT_USER;
+      autoStartRegSet := reg.OpenKeyReadOnly('Software\Microsoft\Windows\CurrentVersion\Run') and reg.ValueExists('SleepTray');
+    finally
+      reg.Free;
+    end;
+
+    // INI ggf. aktualisieren
+    ini.WriteBool('Options', 'AutoStart', autoStartRegSet);
+    FormWake.chkAutostart.Checked := autoStartRegSet;
 
     ShwFiles.Left   := ini.ReadInteger('Window', 'ShwFiles.Left'  , ShwFiles.Left);
     ShwFiles.Top    := ini.ReadInteger('Window', 'ShwFiles.Top'   , ShwFiles.Top);
@@ -910,6 +924,32 @@ begin
   Log('🔁 Schlummern: ' + LastWokenFile + ' für 5 Minuten');
   DoSnooze(60); // Neue WakeTime setzen etc.
   ShowBlueBadgeIcon(60);          // Neuer Badge → alte Session wird automatisch ersetzt
+end;
+
+procedure TFormWake.nachneuerVersionsuchen1Click(Sender: TObject);
+var
+  currentVersion: string;
+  updateInfo: TUpdateInfo;
+begin
+  currentVersion := GetAppVersion; // z. B. '1.1.0'
+
+  if CheckForUpdate(currentVersion, updateInfo) then
+  begin
+    if MessageDlg(
+      Format('Eine neue Version (%s) ist verfügbar!' + sLineBreak + sLineBreak +
+             'Möchten Sie das Update jetzt herunterladen und installieren?' + sLineBreak + sLineBreak +
+             'Änderungen:' + sLineBreak + '%s',
+             [updateInfo.TagName, SimplifyMarkdownForGitHub(updateInfo.ReleaseNotes)]),
+      mtInformation, [mbYes, mbNo], 0) = mrYes then
+    begin
+      OpenURL(updateInfo.DownloadURL);
+    end;
+  end
+  else
+  begin
+    MessageDlg('Du verwendest bereits die aktuellste Version (' + currentVersion + ').',
+               mtInformation, [mbOK], 0);
+  end;
 end;
 
 procedure TFormWake.Scannenaus1Click(Sender: TObject);
