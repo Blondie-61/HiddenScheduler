@@ -137,7 +137,7 @@ begin
             asset := assets.Items[i] as TJSONObject;
 
             // Hier musst Du den echten Dateinamen eintragen:
-            if asset.GetValue<string>('name').ToLower = 'wakehiddensetup.exe' then
+            if asset.GetValue<string>('name').ToLower = 'sleepsetup.exe' then
             begin
               downloadUrl := asset.GetValue<string>('browser_download_url');
               Info.DownloadURL := downloadUrl;
@@ -150,7 +150,7 @@ begin
         if Info.DownloadURL = '' then
         begin
           Info.DownloadURL := Format(
-            'https://github.com/Blondie-61/HiddenScheduler/releases/download/%s/WakeHiddenSetup.exe',
+            'https://github.com/Blondie-61/HiddenScheduler/releases/download/%s/SleepSetup.exe',
             [releaseTag]
           );
         end;
