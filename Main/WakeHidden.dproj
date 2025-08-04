@@ -89,9 +89,9 @@
         <Icon_MainIcon>WakeHidden_Icon8.ico</Icon_MainIcon>
         <UWP_DelphiLogo44>..\Resourcen\CleanShot 2025-07-04 at 20.02.54@2x.png</UWP_DelphiLogo44>
         <UWP_DelphiLogo150>..\Resourcen\CleanShot 2025-07-04 at 20.02.54@2x.png</UWP_DelphiLogo150>
-        <VerInfo_Build>70</VerInfo_Build>
+        <VerInfo_Build>71</VerInfo_Build>
         <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
-        <VerInfo_Keys>CompanyName=Gerhard Waldhelm;FileDescription=$(MSBuildProjectName);FileVersion=1.1.0.70;InternalName=WakeFile;LegalCopyright=2025 by Wa;LegalTrademarks=;OriginalFilename=WakeHidden;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=Gerhard Waldhelm;FileDescription=$(MSBuildProjectName);FileVersion=1.1.0.71;InternalName=WakeFile;LegalCopyright=2025 by Wa;LegalTrademarks=;OriginalFilename=WakeHidden;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
         <DCC_UnitSearchPath>C:\Delphi-Projekte\Komponenten\Virtual-TreeView-master\Source;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <VerInfo_MinorVer>1</VerInfo_MinorVer>
         <VerInfo_Debug>true</VerInfo_Debug>
