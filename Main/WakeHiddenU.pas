@@ -10,6 +10,10 @@ uses
 type
   TTrayIconState = (tisDefault, tisBlue, tisRed);
 
+
+type
+  TIconTheme = (itAuto, itLight, itDark);
+
 type
   TFormWake = class(TForm)
     Timer1: TTimer;
@@ -79,6 +83,7 @@ var
   LastWokenFile: string = '';
   BadgeSessionID: Integer = 0;
   CurrentTrayState: TTrayIconState = tisDefault;
+  CurrentIconTheme: TIconTheme = itAuto;
   iNumberOfFiles: Integer = 0;
   ENABLE_LOGGING: Boolean = False;
 
@@ -666,6 +671,14 @@ begin
     ini.WriteBool('Options', 'AutoStart', autoStartRegSet);
     FormWake.chkAutostart.Checked := autoStartRegSet;
 
+    var themeStr := LowerCase(ini.ReadString('Options', 'IconTheme', 'auto'));
+    if themeStr = 'light' then
+      CurrentIconTheme := itLight
+    else if themeStr = 'dark' then
+      CurrentIconTheme := itDark
+    else
+      CurrentIconTheme := itAuto;
+
     ShwFiles.Left   := ini.ReadInteger('Window', 'ShwFiles.Left'  , ShwFiles.Left);
     ShwFiles.Top    := ini.ReadInteger('Window', 'ShwFiles.Top'   , ShwFiles.Top);
     ShwFiles.Width  := ini.ReadInteger('Window', 'ShwFiles.Width' , ShwFiles.Width);
@@ -709,6 +722,13 @@ begin
     ini.WriteBool('Options', 'EnableSnooze', FormWake.mnuSnoozeEnabled.Checked);
     ini.WriteBool('Options', 'SnoozeDialog', FormWake.SchlummernDialog1.Checked);
     ini.WriteBool('Options', 'AutoStart', FormWake.chkAutostart.Checked);
+
+    if CurrentIconTheme = itLight then
+      ini.WriteString('Options', 'IconTheme', 'Light')
+    else if CurrentIconTheme = itDark then
+      ini.WriteString('Options', 'IconTheme', 'Dark')
+    else
+      ini.WriteString('Options', 'IconTheme', 'Auto');
 
     ini.WriteInteger('Window', 'ShwFiles.Left'  , ShwFiles.Left);
     ini.WriteInteger('Window', 'ShwFiles.Top'   , ShwFiles.Top);
@@ -812,17 +832,41 @@ begin
   UpdateAutoStart(chkAutostart.Checked);
 end;
 
+function IsWhiteIconNeeded: Boolean;
+
+  function IsTaskbarDarkMode: Boolean;
+  var
+    Reg: TRegistry;
+  begin
+    Reg := TRegistry.Create(KEY_READ);
+    try
+      Reg.RootKey := HKEY_CURRENT_USER;
+      if Reg.OpenKeyReadOnly('\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize') then
+        Result := Reg.ReadInteger('SystemUsesLightTheme') = 0
+      else
+        Result := False; // Standard: hell
+    finally
+      Reg.Free;
+    end;
+  end;
+
+begin
+  case CurrentIconTheme of
+    itLight: Result := False;
+    itDark:  Result := True;
+    itAuto:  Result := IsTaskbarDarkMode;
+  end;
+end;
+
 procedure TFormWake.LoadDefaultIcon;
 begin
   SetTrayIconFromImageList(0);
 
-  // Dynamisches App-Icon festlegen (aus C:\Tools\Sleep\app_badge_X.ico)
+  // Dynamisches App-Icon festlegen
   var iconName := 'IconWithBlueBadge0.ico';
   var appIconPath := 'C:\Tools\Sleep\' + iconName;
   SetAppIconFromFile(appIconPath);
 
-//  TrayIcon1.Visible := False; // Refresh
-//  TrayIcon1.Visible := True;
   TrayIcon1.Hint := 'Alles wach!';
   UpdateSnoozeMenuItems(False);
 end;
@@ -851,6 +895,15 @@ begin
   TrayIcon1.Hint := GetInfoText(iNumberOfFiles);
 
   // Dynamisches App-Icon festlegen (aus C:\Tools\Sleep\app_badge_X.ico)
+
+  if iNumberOfFiles > 9 then
+    iconName := IfThen(IsWhiteIconNeeded, 'IconWithBlueBadge9w.ico', 'IconWithBlueBadge9.ico')
+  else
+    iconName := Format(
+      IfThen(IsWhiteIconNeeded, 'IconWithBlueBadge%dw.ico', 'IconWithBlueBadge%d.ico'),
+      [iNumberOfFiles]
+    );
+
   if iNumberOfFiles > 9 then
     iconName := 'IconWithBlueBadge9+.ico'
   else
