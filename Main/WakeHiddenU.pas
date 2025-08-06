@@ -43,6 +43,8 @@ type
     SchlummernDialog1: TMenuItem;
     Taskleistensymbol1: TMenuItem;
     chkAutostart: TMenuItem;
+    mnuVersion: TMenuItem;
+    N5: TMenuItem;
 
     procedure FormCreate(Sender: TObject);
     procedure FormShow(Sender: TObject);
@@ -85,6 +87,7 @@ var
   CurrentTrayState: TTrayIconState = tisDefault;
   CurrentIconTheme: TIconTheme = itAuto;
   iNumberOfFiles: Integer = 0;
+  appIconPath: string = '';
   ENABLE_LOGGING: Boolean = False;
 
 function TaskbarIconEnabled: Boolean;
@@ -114,66 +117,6 @@ begin
     Result := ini.ReadBool('Options', 'ShowInTaskbar', True); // Default: aktiv
   finally
     ini.Free;
-  end;
-end;
-
-function CreateTrayIconWithBadgeNumber(const icoPath: string; number: Integer): HICON;
-var
-  icon: TIcon;
-  bmp: TBitmap;
-  hbmColor, hbmMask: HBITMAP;
-  iconInfo: TIconInfo;
-  canvasRect: TRect;
-  s: string;
-begin
-  Result := 0;
-  if not FileExists(icoPath) then Exit;
-
-  icon := TIcon.Create;
-  bmp := TBitmap.Create;
-  try
-    icon.LoadFromFile(icoPath);
-
-    bmp.Width := icon.Width;
-    bmp.Height := icon.Height;
-    bmp.PixelFormat := pf32bit;
-
-    // Icon in Bitmap zeichnen
-    bmp.Canvas.Draw(0, 0, icon);
-
-    // Badge-Zahl hinzufügen
-    with bmp.Canvas do
-    begin
-      Font.Name := 'Segoe UI';
-      Font.Size := 9;
-      Font.Style := [fsBold];
-      Font.Color := clWhite;
-      Brush.Style := bsSolid;
-      Brush.Color := RGB(10, 100, 240);
-
-      canvasRect := Rect(bmp.Width - 18, bmp.Height - 18, bmp.Width - 2, bmp.Height - 2);
-      Ellipse(canvasRect);
-
-      Brush.Style := bsClear;
-      TextOut(canvasRect.Left + 3, canvasRect.Top + 2, number.ToString);
-    end;
-
-    // In echtes HICON umwandeln
-    hbmColor := bmp.Handle;
-    hbmMask := CreateBitmap(bmp.Width, bmp.Height, 1, 1, nil); // einfache leere Maske
-
-    ZeroMemory(@iconInfo, SizeOf(iconInfo));
-    iconInfo.fIcon := True;
-    iconInfo.hbmColor := hbmColor;
-    iconInfo.hbmMask := hbmMask;
-
-    Result := CreateIconIndirect(iconInfo);
-
-    DeleteObject(hbmMask); // aufräumen!
-
-  finally
-    icon.Free;
-    bmp.Free;
   end;
 end;
 
@@ -248,8 +191,8 @@ begin
 
     FormWake.ImageListWithBadge.GetIcon(index, ico);
     FormWake.TrayIcon1.Icon := ico;
-//    FormWake.TrayIcon1.Visible := False;
-//    FormWake.TrayIcon1.Visible := True;
+    FormWake.TrayIcon1.Visible := False;
+    FormWake.TrayIcon1.Visible := True;
   finally
     ico.Free;
   end;
@@ -525,8 +468,8 @@ begin
                   FormToastF.ShowToast('Die Datei '+ aFn + ' ist aufgewacht.', 'Snooze verfügbar für 60 Sekunden');
 
                 Dec(iNumberOfFiles);
-                UpdateSnoozeMenuItems(True);
                 FormWake.ShowRedBadgeIcon(60);
+                UpdateSnoozeMenuItems(True);
               end;
             end
             else
@@ -747,7 +690,11 @@ begin
 end;
 
 procedure TFormWake.FormCreate(Sender: TObject);
+var
+  V1, V2, V3, V4: word;
 begin
+  appIconPath := IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName));
+
   UpdateTrayIconStatus;
 
   TrayIcon1.Icon.Assign(Application.Icon);
@@ -755,6 +702,8 @@ begin
   TrayIcon1.Visible := True;
   LoadSettings;
   Timer1.Enabled := True;
+  GetBuildInfo(V1, V2, V3, V4);
+  mnuVersion.Caption := 'Version ' + IntToStr(V1) + '.' + IntToStr(V2) + '.' + IntToStr(V3) + '.' + IntToStr(V4);
 
   Visible := False;
   Log('🏷 ExStyle: ' + IntToHex(GetWindowLong(Handle, GWL_EXSTYLE), 8));
@@ -859,13 +808,22 @@ begin
 end;
 
 procedure TFormWake.LoadDefaultIcon;
+var
+  IconName, appIconFn: string;
 begin
-  SetTrayIconFromImageList(0);
+  if not (IsWhiteIconNeeded) then
+  begin
+    SetTrayIconFromImageList(0);
+    IconName := 'IconWithBlueBadge0.ico';
+  end
+  else
+  begin
+    SetTrayIconFromImageList(3);
+    IconName := 'IconWithBlueBadge0_w.ico';
+  end;
 
-  // Dynamisches App-Icon festlegen
-  var iconName := 'IconWithBlueBadge0.ico';
-  var appIconPath := 'C:\Tools\Sleep\' + iconName;
-  SetAppIconFromFile(appIconPath);
+  appIconFn := appIconPath + iconName;
+  SetAppIconFromFile(appIconFn);
 
   TrayIcon1.Hint := 'Alles wach!';
   UpdateSnoozeMenuItems(False);
@@ -888,54 +846,51 @@ end;
 
 procedure TFormWake.ShowBlueBadgeIcon(durationSecs: Integer = 60);
 var
-  iconName, appIconPath: string;
+  iconName, appIconFn: string;
 begin
-  SetTrayIconFromImageList(1);
-
-  TrayIcon1.Hint := GetInfoText(iNumberOfFiles);
-
-  // Dynamisches App-Icon festlegen (aus C:\Tools\Sleep\app_badge_X.ico)
+  if not (IsWhiteIconNeeded) then
+    SetTrayIconFromImageList(1)
+  else
+    SetTrayIconFromImageList(4);
 
   if iNumberOfFiles > 9 then
-    iconName := IfThen(IsWhiteIconNeeded, 'IconWithBlueBadge9w.ico', 'IconWithBlueBadge9.ico')
+    iconName := IfThen(IsWhiteIconNeeded, 'IconWithBlueBadge9+_w.ico', 'IconWithBlueBadge9+.ico')
   else
-    iconName := Format(
-      IfThen(IsWhiteIconNeeded, 'IconWithBlueBadge%dw.ico', 'IconWithBlueBadge%d.ico'),
-      [iNumberOfFiles]
+    iconName := Format(IfThen(IsWhiteIconNeeded, 'IconWithBlueBadge%d_w.ico', 'IconWithBlueBadge%d.ico'), [iNumberOfFiles]
     );
 
-  if iNumberOfFiles > 9 then
-    iconName := 'IconWithBlueBadge9+.ico'
-  else
-    iconName := Format('IconWithBlueBadge%d.ico', [iNumberOfFiles]);
+  appIconFn := appIconPath + iconName;
+  SetAppIconFromFile(appIconFn);
 
-  appIconPath := 'C:\Tools\Sleep\' + iconName;
-  SetAppIconFromFile(appIconPath);
+  TrayIcon1.Hint := GetInfoText(iNumberOfFiles);
 end;
 
 procedure TFormWake.ShowRedBadgeIcon(durationSecs: Integer = 60);
 var
   thisSession: Integer;
+  iconName, appIconFn: string;
 begin
+  FormWake.Timer1.Enabled := False;
+
   Inc(BadgeSessionID); // Neue Session-ID, alte Threads werden ignoriert
   thisSession := BadgeSessionID;
   Log('🆕 Neue Badge-Session: ' + thisSession.ToString);
 
-//  SnoozeActive := True;
-  SetTrayIconFromImageList(2); // Badge laden
+  if not (IsWhiteIconNeeded) then
+    SetTrayIconFromImageList(2)
+  else
+    SetTrayIconFromImageList(5);
+
   TrayIcon1.Hint := 'Snooze-Option aktiv';
 
   // Dynamisches App-Icon festlegen (aus C:\Tools\Sleep\app_badge_X.ico)
-  var iconName := 'IconWithRedBadge.ico';
-  var appIconPath := 'C:\Tools\Sleep\' + iconName;
-  SetAppIconFromFile(appIconPath);
 
-//  TrayIcon1.Visible := False;
-//  TrayIcon1.Visible := True;
+  iconName := IfThen(IsWhiteIconNeeded, 'IconWithRedBadge_w.ico', 'IconWithRedBadge.ico');
+
+  appIconFn := appIconPath + iconName;
+  SetAppIconFromFile(appIconFn);
 
   UpdateSnoozeMenuItems(True);
-
-  FormWake.Timer1.Enabled := False;
 
   TThread.CreateAnonymousThread(procedure
   begin

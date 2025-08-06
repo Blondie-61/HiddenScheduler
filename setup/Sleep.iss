@@ -2,7 +2,7 @@
 
 [Setup]
 AppName=Sleep Tool
-AppVersion=1.1.0
+AppVersion=1.1.1 (Build 71)
 AppPublisher=BlondieSoft
 DefaultDirName=C:\Tools\Sleep
 DisableProgramGroupPage=yes
@@ -12,9 +12,9 @@ OutputBaseFilename=SleepSetup
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=admin
-VersionInfoVersion=1.1.0
-VersionInfoTextVersion=1.1.0
-VersionInfoProductVersion=1.1.0
+VersionInfoVersion=1.1.1
+VersionInfoTextVersion=1.1.1
+VersionInfoProductVersion=1.1.1
 
 [Files]
 Source: "Sleep.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -32,7 +32,19 @@ Source: "IconWithBlueBadge7.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "IconWithBlueBadge8.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "IconWithBlueBadge9.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "IconWithBlueBadge9+.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "IconWithBlueBadge0_w.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "IconWithBlueBadge1_w.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "IconWithBlueBadge2_w.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "IconWithBlueBadge3_w.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "IconWithBlueBadge4_w.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "IconWithBlueBadge5_w.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "IconWithBlueBadge6_w.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "IconWithBlueBadge7_w.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "IconWithBlueBadge8_w.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "IconWithBlueBadge9_w.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "IconWithBlueBadge9+_w.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "IconWithRedBadge.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "IconWithRedBadge_w.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\Sleep Tool"; Filename: "{app}\Sleep.exe"

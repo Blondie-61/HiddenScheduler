@@ -15,6 +15,7 @@ type
 
 function SimplifyMarkdownForGitHub(const md: string): string;
 procedure OpenURL(const URL: string);
+procedure GetBuildInfo(var V1, V2, V3, V4: word);
 function GetAppVersion: string;
 function CheckForUpdate(const CurrentVersion: string; out Info: TUpdateInfo): Boolean;
 
@@ -58,34 +59,34 @@ begin
   ShellExecute(0, 'open', PChar(URL), nil, nil, SW_SHOWNORMAL);
 end;
 
+procedure GetBuildInfo(var V1, V2, V3, V4: word);
+var
+  VerInfoSize, VerValueSize, Dummy: DWord;
+  VerInfo: Pointer;
+  VerValue: PVSFixedFileInfo;
+
+begin
+  VerInfoSize := GetFileVersionInfoSize(PChar(ParamStr(0)), Dummy);
+  GetMem(VerInfo, VerInfoSize);
+  GetFileVersionInfo(PChar(ParamStr(0)), 0, VerInfoSize, VerInfo);
+  VerQueryValue(VerInfo, '\', Pointer(VerValue), VerValueSize);
+  with VerValue^ do
+  begin
+    V1 := dwFileVersionMS shr 16;
+    V2 := dwFileVersionMS and $FFFF;
+    V3 := dwFileVersionLS shr 16;
+    V4 := dwFileVersionLS and $FFFF;
+  end;
+  FreeMem(VerInfo, VerInfoSize);
+end;
+
+
 function GetAppVersion: string;
 var
   V1, V2, V3, V4: word;
 
-  procedure GetBuildInfo(var V1, V2, V3, V4: word);
-  var
-    VerInfoSize, VerValueSize, Dummy: DWord;
-    VerInfo: Pointer;
-    VerValue: PVSFixedFileInfo;
-
-  begin
-    VerInfoSize := GetFileVersionInfoSize(PChar(ParamStr(0)), Dummy);
-    GetMem(VerInfo, VerInfoSize);
-    GetFileVersionInfo(PChar(ParamStr(0)), 0, VerInfoSize, VerInfo);
-    VerQueryValue(VerInfo, '\', Pointer(VerValue), VerValueSize);
-    with VerValue^ do
-    begin
-      V1 := dwFileVersionMS shr 16;
-      V2 := dwFileVersionMS and $FFFF;
-      V3 := dwFileVersionLS shr 16;
-      V4 := dwFileVersionLS and $FFFF;
-    end;
-    FreeMem(VerInfo, VerInfoSize);
-  end;
-
 begin
   GetBuildInfo(V1, V2, V3, V4);
-//  Result := IntToStr(V1) + '.' + IntToStr(V2) + '.' + IntToStr(V3) + '.' + IntToStr(V4);
   Result := IntToStr(V1) + '.' + IntToStr(V2) + '.' + IntToStr(V3);
 //  Result := '1.0.0';
 end;
