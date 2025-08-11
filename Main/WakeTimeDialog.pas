@@ -27,7 +27,9 @@ type
   private
 
   public
-    class function Execute(out selectedTime: TDateTime): Boolean;
+//    class function Execute(out selectedTime: TDateTime): Boolean;
+    class function Execute(out selectedTime: TDateTime): Boolean; overload;
+    class function Execute(out selectedTime: TDateTime; out autoHideAfter: Integer): Boolean; overload;
   end;
 
 var
@@ -141,15 +143,24 @@ begin
 end;
 
 class function TfrmWakeTimeDialog.Execute(out selectedTime: TDateTime): Boolean;
+var
+  dlg: TfrmWakeTimeDialog;
 begin
-  with TfrmWakeTimeDialog.Create(nil) do
+  dlg := TfrmWakeTimeDialog.Create(nil);
   try
-    Result := ShowModal = mrOK;
+    Result := (dlg.ShowModal = mrOk);
     if Result then
-      selectedTime := DTWakeTime.DateTime;
+      selectedTime := Dlg.DTWakeTime.DateTime;
   finally
-    Free;
+    dlg.Free;
   end;
+end;
+
+// Neue Overload-Variante mit AutoHideAfter
+class function TfrmWakeTimeDialog.Execute(out selectedTime: TDateTime; out autoHideAfter: Integer): Boolean;
+begin
+  autoHideAfter := 0; // Standardwert, bis Feature genutzt wird
+  Result := Execute(selectedTime); // Ruft die bestehende Version auf
 end;
 
 end.

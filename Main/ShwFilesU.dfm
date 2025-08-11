@@ -77,7 +77,6 @@ object ShwFiles: TShwFiles
     Margins.Bottom = 6
     Panels = <>
     SimplePanel = True
-    ExplicitTop = 763
   end
   object ActionList1: TActionList
     Left = 1352
@@ -2499,47 +2498,51 @@ object ShwFiles: TShwFiles
       Caption = '-'
     end
     object Snooze1: TMenuItem
-      Caption = 'Schlafen bis in'
+      Caption = 'Schlafen bis in (Snooze)'
       object N5Min1: TMenuItem
         Tag = 5
         Caption = '5 Min'
-        OnClick = PopUpVSTMinClick
+        OnClick = ApplySnoozeToSelection
       end
       object N5Min2: TMenuItem
         Tag = 15
         Caption = '15 Min'
-        OnClick = PopUpVSTMinClick
+        OnClick = ApplySnoozeToSelection
       end
       object N30Min1: TMenuItem
         Tag = 30
         Caption = '30 Min'
-        OnClick = PopUpVSTMinClick
+        OnClick = ApplySnoozeToSelection
       end
       object N30Min2: TMenuItem
         Tag = 60
         Caption = '1 h'
-        OnClick = PopUpVSTMinClick
+        OnClick = ApplySnoozeToSelection
       end
       object N2h1: TMenuItem
         Tag = 120
         Caption = '2 h'
-        OnClick = PopUpVSTMinClick
+        OnClick = ApplySnoozeToSelection
       end
       object N2h2: TMenuItem
         Tag = 240
         Caption = '4 h'
-        OnClick = PopUpVSTMinClick
+        OnClick = ApplySnoozeToSelection
       end
       object N8h1: TMenuItem
         Tag = 480
         Caption = '8 h'
-        OnClick = PopUpVSTMinClick
+        OnClick = ApplySnoozeToSelection
       end
       object N8h2: TMenuItem
         Tag = 1440
         Caption = '24 h'
-        OnClick = PopUpVSTMinClick
+        OnClick = ApplySnoozeToSelection
       end
+    end
+    object Individuell1: TMenuItem
+      Caption = 'Neue Weckzeit festlegen'
+      OnClick = Individuell1Click
     end
   end
 end

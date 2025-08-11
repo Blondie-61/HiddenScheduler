@@ -2,7 +2,7 @@
 
 [Setup]
 AppName=Sleep Tool
-AppVersion=1.1.1 (Build 71)
+AppVersion=1.1.2 (Build 75)
 AppPublisher=BlondieSoft
 DefaultDirName=C:\Tools\Sleep
 DisableProgramGroupPage=yes
@@ -12,9 +12,9 @@ OutputBaseFilename=SleepSetup
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=admin
-VersionInfoVersion=1.1.1
-VersionInfoTextVersion=1.1.1
-VersionInfoProductVersion=1.1.1
+VersionInfoVersion=1.1.2
+VersionInfoTextVersion=1.1.2
+VersionInfoProductVersion=1.1.2
 
 [Files]
 Source: "Sleep.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -50,36 +50,43 @@ Source: "IconWithRedBadge_w.ico"; DestDir: "{app}"; Flags: ignoreversion
 Name: "{autoprograms}\Sleep Tool"; Filename: "{app}\Sleep.exe"
 
 [Registry]
-; Kontextmenü "Schlafen ..."
-Root: HKCR; Subkey: "*\shell\Schlafen"; ValueType: string; ValueName: "MUIVerb"; ValueData: "Schlafen ..."
-Root: HKCR; Subkey: "*\shell\Schlafen"; ValueType: string; ValueName: "SubCommands"; ValueData: ""
-Root: HKCR; Subkey: "*\shell\Schlafen"; ValueType: string; ValueName: "Icon"; ValueData: "shell32.dll,50"
-Root: HKCR; Subkey: "*\shell\Schlafen\shell"; Flags: uninsdeletekey
+; --- Altbestand beim Installieren vollständig entfernen ---
+Root: HKCR; Subkey: "*\shell\Sleep"; Flags: deletekey
+Root: HKCR; Subkey: "*\shell\SleepIndividuell"; Flags: deletekey
 
-Root: HKCR; Subkey: "*\shell\Schlafen\shell\1h"; ValueType: string; ValueName: ""; ValueData: "1 Stunde"
-Root: HKCR; Subkey: "*\shell\Schlafen\shell\1h\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Sleep.exe"" ""%1"" 1h"
+; --- Kontextmenü "Sleep ..." neu anlegen ---
+Root: HKCR; Subkey: "*\shell\Sleep"; ValueType: string; ValueName: "MUIVerb"; ValueData: "Schlafen ..."
+Root: HKCR; Subkey: "*\shell\Sleep"; ValueType: string; ValueName: "SubCommands"; ValueData: ""
+Root: HKCR; Subkey: "*\shell\Sleep"; ValueType: string; ValueName: "Icon"; ValueData: "shell32.dll,50"
 
-Root: HKCR; Subkey: "*\shell\Schlafen\shell\2h"; ValueType: string; ValueName: ""; ValueData: "2 Stunden"
-Root: HKCR; Subkey: "*\shell\Schlafen\shell\2h\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Sleep.exe"" ""%1"" 2h"
+; Untermenü-Container; beim Uninstall mit entfernen
+Root: HKCR; Subkey: "*\shell\Sleep\shell"; Flags: uninsdeletekey
 
-Root: HKCR; Subkey: "*\shell\Schlafen\shell\4h"; ValueType: string; ValueName: ""; ValueData: "4 Stunden"
-Root: HKCR; Subkey: "*\shell\Schlafen\shell\4h\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Sleep.exe"" ""%1"" 4h"
+; --- Einträge ---
+Root: HKCR; Subkey: "*\shell\Sleep\shell\1h";                ValueType: string; ValueName: ""; ValueData: "1 Stunde"
+Root: HKCR; Subkey: "*\shell\Sleep\shell\1h\command";         ValueType: string; ValueName: ""; ValueData: """{app}\Sleep.exe"" ""%1"" 1h"
 
-Root: HKCR; Subkey: "*\shell\Schlafen\shell\morgen"; ValueType: string; ValueName: ""; ValueData: "Bis morgen früh"
-Root: HKCR; Subkey: "*\shell\Schlafen\shell\morgen\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Sleep.exe"" ""%1"" morgen"
+Root: HKCR; Subkey: "*\shell\Sleep\shell\2h";                ValueType: string; ValueName: ""; ValueData: "2 Stunden"
+Root: HKCR; Subkey: "*\shell\Sleep\shell\2h\command";         ValueType: string; ValueName: ""; ValueData: """{app}\Sleep.exe"" ""%1"" 2h"
 
-Root: HKCR; Subkey: "*\shell\Schlafen\shell\wochenende"; ValueType: string; ValueName: ""; ValueData: "Am Wochenende"
-Root: HKCR; Subkey: "*\shell\Schlafen\shell\wochenende\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Sleep.exe"" ""%1"" wochenende"
+Root: HKCR; Subkey: "*\shell\Sleep\shell\4h";                ValueType: string; ValueName: ""; ValueData: "4 Stunden"
+Root: HKCR; Subkey: "*\shell\Sleep\shell\4h\command";         ValueType: string; ValueName: ""; ValueData: """{app}\Sleep.exe"" ""%1"" 4h"
 
-Root: HKCR; Subkey: "*\shell\Schlafen\shell\z_individuell"; ValueType: string; ValueName: ""; ValueData: "Individuell ..."
-Root: HKCR; Subkey: "*\shell\Schlafen\shell\z_individuell\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Sleep.exe"" ""%1"" z_individuell"
+Root: HKCR; Subkey: "*\shell\Sleep\shell\morgen";            ValueType: string; ValueName: ""; ValueData: "Bis morgen früh"
+Root: HKCR; Subkey: "*\shell\Sleep\shell\morgen\command";     ValueType: string; ValueName: ""; ValueData: """{app}\Sleep.exe"" ""%1"" morgen"
 
-; Zweiter Eintrag mit Icon und Shield
-Root: HKCR; Subkey: "*\shell\SleepIndividuell"; ValueType: string; ValueData: "Schlafen …"
+Root: HKCR; Subkey: "*\shell\Sleep\shell\wochenende";        ValueType: string; ValueName: ""; ValueData: "Am Wochenende"
+Root: HKCR; Subkey: "*\shell\Sleep\shell\wochenende\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Sleep.exe"" ""%1"" wochenende"
+
+Root: HKCR; Subkey: "*\shell\Sleep\shell\z_individuell";     ValueType: string; ValueName: ""; ValueData: "Individuell ..."
+Root: HKCR; Subkey: "*\shell\Sleep\shell\z_individuell\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Sleep.exe"" ""%1"" z_individuell"
+
+; --- Zweiter Eintrag mit Icon/Shield (optional) ---
+Root: HKCR; Subkey: "*\shell\SleepIndividuell";                      ValueType: string; ValueData: "Schlafen …"
 Root: HKCR; Subkey: "*\shell\SleepIndividuell"; ValueName: "HasLUAShield"; ValueType: string; ValueData: ""
-Root: HKCR; Subkey: "*\shell\SleepIndividuell"; ValueName: "Icon"; ValueType: string; ValueData: """{app}\Sleep.ico"""
-Root: HKCR; Subkey: "*\shell\SleepIndividuell"; ValueName: "Position"; ValueType: string; ValueData: "Top"
-Root: HKCR; Subkey: "*\shell\SleepIndividuell\command"; ValueType: string; ValueData: """{app}\Sleep.exe"" ""%1"" z_individuell"
+Root: HKCR; Subkey: "*\shell\SleepIndividuell"; ValueName: "Icon";        ValueType: string; ValueData: """{app}\Sleep.ico"""
+Root: HKCR; Subkey: "*\shell\SleepIndividuell"; ValueName: "Position";    ValueType: string; ValueData: "Top"
+Root: HKCR; Subkey: "*\shell\SleepIndividuell\command";                    ValueType: string; ValueData: """{app}\Sleep.exe"" ""%1"" z_individuell"
 
 [Tasks]
 Name: "autostart"; Description: "Sleep automatisch beim Windows-Start starten"; GroupDescription: "Optionale Einstellungen:"; Flags: unchecked

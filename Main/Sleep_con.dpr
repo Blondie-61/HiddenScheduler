@@ -187,8 +187,17 @@ begin
       Exit;
     end;
 
-    var filePath := TPath.GetFullPath(ParamStr(1));
-    var option := ParamStr(2);
+    // Zeitoption = letzter Parameter
+    var option := ParamStr(ParamCount);
+
+    // Dateipfad = alle vorherigen Parameter wieder zusammensetzen
+    var filePath := '';
+    for var i := 1 to ParamCount - 1 do
+    begin
+      if filePath <> '' then filePath := filePath + ' ';
+      filePath := filePath + ParamStr(i);
+    end;
+    filePath := TPath.GetFullPath(filePath);
 
     // Mutex für diese Datei erstellen
     var mutex := CreateMutexForFile(filePath);
@@ -198,7 +207,7 @@ begin
       Exit;
     end;
 
-    // WakeTime berechnen (abhängig von option)
+    // WakeTime berechnen
     var wakeTime := GetWakeUpTime(option);
 
     HideFile(filePath);
@@ -208,8 +217,9 @@ begin
     on E: Exception do
     begin
       Log('💥 FEHLER: ' + E.Message);
-      MessageBox(0, PChar(E.Message), 'Fehler in Sleep_con', MB_ICONERROR);
+      MessageBox(0, PChar(E.Message), 'Fehler in sleep_con', MB_ICONERROR);
     end;
   end;
-end.
+
+  end.
 

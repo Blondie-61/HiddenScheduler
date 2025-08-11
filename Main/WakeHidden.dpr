@@ -9,7 +9,8 @@ uses
   ShwFilesU in 'ShwFilesU.pas' {ShwFiles},
   FormToastU in 'FormToastU.pas' {FormToastF},
   AppIconHostU in 'AppIconHostU.pas' {FormAppIconHost},
-  UpdateChecker in 'UpdateChecker.pas';
+  UpdateChecker in 'UpdateChecker.pas',
+  WakeTimeDialog in 'WakeTimeDialog.pas' {frmWakeTimeDialog};
 
 {$R *.res}
 //  function TaskbarIconEnabled: Boolean;
@@ -31,6 +32,7 @@ begin
   begin
     Application.MainFormOnTaskbar := True;
     Application.CreateForm(TShwFiles, ShwFiles);
+  Application.CreateForm(TfrmWakeTimeDialog, frmWakeTimeDialog);
   // sichtbar in Taskbar
   end
   else

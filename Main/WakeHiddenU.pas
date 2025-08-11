@@ -191,8 +191,8 @@ begin
 
     FormWake.ImageListWithBadge.GetIcon(index, ico);
     FormWake.TrayIcon1.Icon := ico;
-    FormWake.TrayIcon1.Visible := False;
-    FormWake.TrayIcon1.Visible := True;
+//    FormWake.TrayIcon1.Visible := False;
+//    FormWake.TrayIcon1.Visible := True;
   finally
     ico.Free;
   end;

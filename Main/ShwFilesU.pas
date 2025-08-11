@@ -32,6 +32,7 @@ type
     N8h1: TMenuItem;
     N8h2: TMenuItem;
     StatusBar1: TStatusBar;
+    Individuell1: TMenuItem;
 
     procedure FormCreate(Sender: TObject);
     procedure FormShow(Sender: TObject);
@@ -39,9 +40,9 @@ type
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
 
     procedure actReFreshExecute(Sender: TObject);
+    procedure Individuell1Click(Sender: TObject);
     procedure Jetztaufwecken1Click(Sender: TObject);
     procedure PopupVSTClose(Sender: TObject);
-    procedure PopUpVSTMinClick(Sender: TObject);
     procedure PopupVSTPopup(Sender: TObject);
     procedure VSTxBeforeCellPaint(Sender: TBaseVirtualTree; TargetCanvas: TCanvas;
         Node: PVirtualNode; Column: TColumnIndex; CellPaintMode: TVTCellPaintMode;
@@ -53,8 +54,10 @@ type
         TImageIndex);
     procedure VSTxGetText(Sender: TBaseVirtualTree; Node: PVirtualNode; Column:
         TColumnIndex; TextType: TVSTTextType; var CellText: string);
+    procedure ApplySnoozeToSelection(Sender: TObject);
  private
     procedure LoadJsonToVST;
+    procedure ApplyWakeDialogToSelection;
   public
     { Public-Deklarationen }
   protected
@@ -82,7 +85,7 @@ implementation
 
 {$R *.dfm}
 
-uses WakeHiddenU;
+uses WakeHiddenU, WakeTimeDialog;
 
 procedure TShwFiles.FormCreate(Sender: TObject);
 begin
@@ -133,7 +136,12 @@ begin
 
   VST.NodeDataSize := SizeOf(TFileNodeData);
 
-//  VST.OnCompareNodes := VSTCompareNodes;
+  with VST.TreeOptions do
+  begin
+    SelectionOptions := SelectionOptions + [toMultiSelect, toFullRowSelect, toExtendedFocus];
+    MiscOptions      := MiscOptions + [toGridExtensions];
+    PaintOptions     := PaintOptions + [toUseBlendedImages];
+  end;
 
   LoadJsonToVST;
 end;
@@ -141,6 +149,29 @@ end;
 procedure TShwFiles.FormShow(Sender: TObject);
 begin
   actRefresh.Execute;
+end;
+
+procedure TShwFiles.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  if (TaskbarIconEnabled) then
+  begin
+    Action := caNone; // NICHT schließen!
+    WindowState := wsMinimized; // nur minimieren
+  end
+  else
+    Action := caHide;
+end;
+
+procedure TShwFiles.FormActivate(Sender: TObject);
+begin
+  if (FrstRun) and (bTskBarEnabled) then
+    if WindowState = wsMinimized then
+      WindowState := wsNormal
+  else
+    FrstRun := False;
+
+  BringToFront;
+  SetForegroundWindow(Handle);
 end;
 
 procedure TShwFiles.LoadJsonToVST;
@@ -216,17 +247,6 @@ begin
   end;
 end;
 
-procedure TShwFiles.FormClose(Sender: TObject; var Action: TCloseAction);
-begin
-  if (TaskbarIconEnabled) then
-  begin
-    Action := caNone; // NICHT schließen!
-    WindowState := wsMinimized; // nur minimieren
-  end
-  else
-    Action := caHide;
-end;
-
 procedure WakeFileNow(const filePath: string);
 var
   jsonFile, jsonStr: string;
@@ -285,23 +305,12 @@ begin
 
 end;
 
-procedure TShwFiles.FormActivate(Sender: TObject);
-begin
-  if (FrstRun) and (bTskBarEnabled) then
-    if WindowState = wsMinimized then
-      WindowState := wsNormal
-  else
-    FrstRun := False;
-
-  BringToFront;
-  SetForegroundWindow(Handle);
-end;
-
 procedure TShwFiles.Jetztaufwecken1Click(Sender: TObject);
 var
   node: PVirtualNode;
   data: PFileNodeData;
 begin
+  FormWake.Timer1.Enabled := False;
   node := VST.FocusedNode;
   if not Assigned(node) then Exit;
 
@@ -309,98 +318,17 @@ begin
   if not Assigned(data) then Exit;
 
   WakeFileNow(IncludeTrailingPathDelimiter(data^.Directory) + data^.FileName);
-//  actReFresh.Execute;
-end;
-
-procedure TShwFiles.PopupVSTClose(Sender: TObject);
-begin
   FormWake.Timer1.Enabled := True;
-end;
-
-procedure TShwFiles.PopUpVSTMinClick(Sender: TObject);
-
-  procedure SleepFileForMinutes(const filePath: string; minutes: Integer);
-  var
-    jsonFile: string;
-    jsonStr: string;
-    jsonArr: TJSONArray;
-    jsonObj: TJSONObject;
-    i: Integer;
-    found: Boolean;
-    newWake: TDateTime;
-  begin
-    newWake := IncMinute(Now, minutes);
-    jsonFile := GetJsonFilePath;
-
-    // JSON laden oder neue Liste erzeugen
-    if TFile.Exists(jsonFile) then
-      jsonStr := TFile.ReadAllText(jsonFile)
-    else
-      jsonStr := '[]';
-
-    jsonArr := TJSONObject.ParseJSONValue(jsonStr) as TJSONArray;
-    if not Assigned(jsonArr) then
-    begin
-      jsonArr := TJSONArray.Create;
-      Log('⚠️ Fehler beim Parsen der JSON – neue Liste angelegt (Sleep)');
-    end;
-
-    found := False;
-
-    for i := 0 to jsonArr.Count - 1 do
-    begin
-      jsonObj := jsonArr.Items[i] as TJSONObject;
-      if jsonObj.GetValue<string>('path') = filePath then
-      begin
-        jsonObj.RemovePair('wakeTime');
-        jsonObj.AddPair('wakeTime', DateToISO8601(newWake, True));
-        jsonObj.RemovePair('hideTime');
-        jsonObj.AddPair('hideTime', DateToISO8601(Now, True));
-        found := True;
-        Break;
-      end;
-    end;
-
-    if not found then
-    begin
-      jsonObj := TJSONObject.Create;
-      jsonObj.AddPair('path', filePath);
-      jsonObj.AddPair('hideTime', DateToISO8601(Now, True));
-      jsonObj.AddPair('wakeTime', DateToISO8601(newWake, True));
-      jsonArr.AddElement(jsonObj);
-    end;
-
-    TFile.WriteAllText(jsonFile, jsonArr.ToJSON);
-    jsonArr.Free;
-
-    Log(Format('💤 SleepFileForMinutes: %s für %d min', [filePath, minutes]));
-
-    if ShwFiles.Visible then
-      ShwFiles.actReFreshExecute(nil);
-  end;
-
-var
-  minutes: Integer;
-  node: PVirtualNode;
-  data: PFileNodeData;
-  filePath: string;
-begin
-  node := VST.FocusedNode;
-  if not Assigned(node) then Exit;
-
-  data := VST.GetNodeData(node);
-  if not Assigned(data) then Exit;
-
-  minutes := TMenuItem(Sender).Tag;
-  filePath := IncludeTrailingPathDelimiter(data^.Directory) + data^.FileName;
-  SleepFileForMinutes(filePath, minutes);
-
-  actReFresh.Execute;
 end;
 
 procedure TShwFiles.PopupVSTPopup(Sender: TObject);
 begin
   FormWake.Timer1.Enabled := False;
+end;
+
+procedure TShwFiles.PopupVSTClose(Sender: TObject);
+begin
+  FormWake.Timer1.Enabled := True;
 end;
 
 procedure TShwFiles.VSTxBeforeCellPaint(Sender: TBaseVirtualTree; TargetCanvas:
@@ -455,6 +383,78 @@ begin
   end;
 end;
 
+procedure SleepFile(const filePath: string; minutes: Integer = 0; wakeTime: TDateTime = 0; autoHideAfter: Integer = 0);
+var
+  jsonFile: string;
+  jsonStr: string;
+  jsonArr: TJSONArray;
+  jsonObj: TJSONObject;
+  i: Integer;
+  found: Boolean;
+  finalWake: TDateTime;
+begin
+if wakeTime > 0 then
+    finalWake := wakeTime
+  else
+    finalWake := IncMinute(Now, minutes);
+
+  jsonFile := GetJsonFilePath;
+
+  // JSON laden oder neue Liste erzeugen
+  if TFile.Exists(jsonFile) then
+    jsonStr := TFile.ReadAllText(jsonFile)
+  else
+    jsonStr := '[]';
+
+  jsonArr := TJSONObject.ParseJSONValue(jsonStr) as TJSONArray;
+  if not Assigned(jsonArr) then
+  begin
+    jsonArr := TJSONArray.Create;
+    Log('⚠️ Fehler beim Parsen der JSON – neue Liste angelegt (Sleep)');
+  end;
+
+  found := False;
+
+  for i := 0 to jsonArr.Count - 1 do
+  begin
+    jsonObj := jsonArr.Items[i] as TJSONObject;
+    if jsonObj.GetValue<string>('path') = filePath then
+    begin
+      jsonObj.RemovePair('wakeTime');
+      jsonObj.AddPair('wakeTime', DateToISO8601(finalWake, True));
+      jsonObj.RemovePair('hideTime');
+      jsonObj.AddPair('hideTime', DateToISO8601(Now, True));
+
+      jsonObj.RemovePair('autoHideAfter');
+      jsonObj.AddPair('autoHideAfter', TJSONNumber.Create(autoHideAfter));
+
+      found := True;
+      Break;
+    end;
+  end;
+
+  if not found then
+  begin
+    jsonObj := TJSONObject.Create;
+    jsonObj.AddPair('path', filePath);
+    jsonObj.AddPair('hideTime', DateToISO8601(Now, True));
+    jsonObj.AddPair('wakeTime', DateToISO8601(finalWake, True));
+    jsonObj.AddPair('autoHideAfter', TJSONNumber.Create(autoHideAfter));
+    jsonArr.AddElement(jsonObj);
+  end;
+
+  TFile.WriteAllText(jsonFile, jsonArr.ToJSON);
+  jsonArr.Free;
+
+  if minutes > 0 then
+    Log(Format('💤 SleepFile: %s für %d min', [filePath, minutes]))
+  else
+    Log(Format('💤 SleepFile: %s bis %s', [filePath, DateTimeToStr(finalWake)]));
+
+  if ShwFiles.Visible then
+    ShwFiles.actReFreshExecute(nil);
+end;
+
 procedure TShwFiles.VSTxGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
   Column: TColumnIndex; TextType: TVSTTextType; var CellText: string);
 var
@@ -470,6 +470,111 @@ begin
     3: CellText := FormatDateTime('dd.mm.yyyy hh:nn:ss', Data.WakeTime);
     4: CellText := Data.MinutesToWake.ToString;
   end;
+end;
+
+procedure TShwFiles.ApplySnoozeToSelection(Sender: TObject);
+var
+  minutes: Integer;
+  Node: PVirtualNode;
+  Data: PFileNodeData;
+  filePath: string;
+  SelNodes: TArray<PVirtualNode>;
+  Count, i: Integer;
+begin
+  if VST.SelectedCount = 0 then Exit;
+
+  minutes := TMenuItem(Sender).Tag;
+
+  // Auswahl sichern
+  SetLength(SelNodes, VST.SelectedCount);
+  Node := VST.GetFirstSelected;
+  Count := 0;
+  while Assigned(Node) do
+  begin
+    SelNodes[Count] := Node;
+    Inc(Count);
+    Node := VST.GetNextSelected(Node);
+  end;
+
+  VST.BeginUpdate;
+  try
+    for i := 0 to High(SelNodes) do
+    begin
+      Data := VST.GetNodeData(SelNodes[i]);
+      if Assigned(Data) then
+      begin
+        filePath := IncludeTrailingPathDelimiter(Data^.Directory) + Data^.FileName;
+        SleepFile(filePath, minutes);
+      end;
+    end;
+  finally
+    VST.EndUpdate;
+  end;
+
+  actRefresh.Execute;
+end;
+
+procedure TShwFiles.Individuell1Click(Sender: TObject);
+begin
+  FormWake.Timer1.Enabled := False;
+  ApplyWakeDialogToSelection;
+  FormWake.Timer1.Enabled := True;
+end;
+
+procedure TShwFiles.ApplyWakeDialogToSelection;
+var
+  SelNodes: TArray<PVirtualNode>;
+  Node: PVirtualNode;
+  Data: PFileNodeData;
+  WakeTime: TDateTime;
+  AutoHideAfter: Integer; // Minuten, 0 = kein AutoHide
+  FilePath: string;
+  Count, i: Integer;
+begin
+  if VST.SelectedCount = 0 then Exit;
+
+  // Dialog EINMAL: liefert WakeTime + optional AutoHideAfter (Minuten)
+  if not TfrmWakeTimeDialog.Execute(WakeTime, AutoHideAfter) then
+    raise Exception.Create('Auswahl abgebrochen. Keine WakeTime festgelegt.');
+
+  // Auswahl sichern (wichtig: sonst zerhaut Refresh/Invalidate die Iteration)
+  SetLength(SelNodes, VST.SelectedCount);
+  Node := VST.GetFirstSelected;
+  Count := 0;
+  while Assigned(Node) do
+  begin
+    SelNodes[Count] := Node;
+    Inc(Count);
+    Node := VST.GetNextSelected(Node);
+  end;
+
+  VST.BeginUpdate;
+  try
+    for i := 0 to High(SelNodes) do
+    begin
+      Data := VST.GetNodeData(SelNodes[i]);
+      if not Assigned(Data) then Continue;
+
+      FilePath := IncludeTrailingPathDelimiter(Data^.Directory) + Data^.FileName;
+
+      // Speichern: absolutes Datum + optional AutoHideAfter
+      if AutoHideAfter > 0 then
+        SleepFile(FilePath, 0, WakeTime, AutoHideAfter)
+      else
+        SleepFile(FilePath, 0, WakeTime);
+
+      // Model/Anzeige aktualisieren
+      Data^.HideTime      := Now;
+      Data^.WakeTime      := WakeTime;
+      Data^.MinutesToWake := Round((WakeTime - Now) * 24 * 60);
+
+      VST.InvalidateNode(SelNodes[i]);
+    end;
+  finally
+    VST.EndUpdate;
+  end;
+
+  actRefresh.Execute;
 end;
 
 end.
