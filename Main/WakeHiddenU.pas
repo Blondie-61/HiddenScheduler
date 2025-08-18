@@ -5,11 +5,21 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics, WinAPI.ShellAPI,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ExtCtrls, System.ImageList, Vcl.ImgList, System.Actions, Vcl.ActnList, Vcl.Menus,
-  System.IOUtils, System.JSON, System.DateUtils, System.IniFiles, MMSystem, Winapi.CommCtrl, StrUtils, Registry,
+  System.IOUtils, System.JSON, System.DateUtils, System.IniFiles, MMSystem, Winapi.CommCtrl, StrUtils, Registry, Generics.Collections,
   System.Types, VirtualTrees.Types;
+
+type
+  TWakeItem = record
+    Path: string;
+    Scheduled: TDateTime;
+  end;
+
+var
+  WakeQueue: TQueue<TWakeItem>;
+  QueueCS: TRTLCriticalSection;
+
 type
   TTrayIconState = (tisDefault, tisBlue, tisRed);
-
 
 type
   TIconTheme = (itAuto, itLight, itDark);
@@ -88,7 +98,7 @@ var
   CurrentIconTheme: TIconTheme = itAuto;
   iNumberOfFiles: Integer = 0;
   appIconPath: string = '';
-  ENABLE_LOGGING: Boolean = False;
+  ENABLE_LOGGING: Boolean = True;
 
 function TaskbarIconEnabled: Boolean;
 function GetAppDataPath: string;
@@ -100,6 +110,17 @@ function GetInfoText(Count: Integer = 0): string;
 procedure DoSnooze(minutes: Integer);
 procedure LoadSettings;
 procedure SaveSettings;
+
+// Queueing
+procedure SaveToQueue(const item: TWakeItem);
+function GetFromQueue(out item: TWakeItem): Boolean;
+function GetQueueCount: Integer;
+function HasQueuePending: Boolean;
+function IsActiveWake: Boolean;
+procedure AdvanceAfterToastIfNeeded;
+procedure StartNextFromQueue(Force: Boolean = False);
+procedure AdvanceQueueNow(skipToastClose: Boolean = False);
+procedure AdvanceNowDueToUserAction;
 
 implementation
 
@@ -198,46 +219,38 @@ begin
   end;
 end;
 
+function IsWhiteIconNeeded: Boolean;
+
+  function IsTaskbarDarkMode: Boolean;
+  var
+    Reg: TRegistry;
+  begin
+    Reg := TRegistry.Create(KEY_READ);
+    try
+      Reg.RootKey := HKEY_CURRENT_USER;
+      if Reg.OpenKeyReadOnly('\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize') then
+        Result := Reg.ReadInteger('SystemUsesLightTheme') = 0
+      else
+        Result := False; // Standard: hell
+    finally
+      Reg.Free;
+    end;
+  end;
+
+begin
+  case CurrentIconTheme of
+    itLight: Result := False;
+    itDark:  Result := True;
+    itAuto:  Result := IsTaskbarDarkMode;
+  end;
+end;
+
 procedure UpdateSnoozeMenuItems(visible: Boolean);
 begin
   Log('🛠 Menüeinträge Snooze sichtbar: ' + BoolToStr(visible, True));
   FormWake.mnuSnooze5.Visible := visible;
   FormWake.mnuSnooze15.Visible := visible;
   FormWake.mnuSnooze60.Visible := visible;
-end;
-
-procedure UpdateJsonEntry(const filePath: string; const newHide, newWake: TDateTime; const newStatus: string);
-var
-  jsonFile, jsonStr: string;
-  jsonArr: TJSONArray;
-  jsonObj: TJSONObject;
-  i: Integer;
-begin
-  jsonFile := GetJsonFilePath;
-  if not TFile.Exists(jsonFile) then Exit;
-
-  jsonStr := TFile.ReadAllText(jsonFile);
-  jsonArr := TJSONObject.ParseJSONValue(jsonStr) as TJSONArray;
-  if not Assigned(jsonArr) then Exit;
-
-  for i := 0 to jsonArr.Count - 1 do
-  begin
-    jsonObj := jsonArr.Items[i] as TJSONObject;
-    if jsonObj.GetValue<string>('path') = filePath then
-    begin
-      jsonObj.RemovePair('hideTime');
-      jsonObj.RemovePair('wakeTime');
-      jsonObj.RemovePair('status');
-
-      jsonObj.AddPair('hideTime', DateToISO8601(newHide, True));
-      jsonObj.AddPair('wakeTime', DateToISO8601(newWake, True));
-      jsonObj.AddPair('status', newStatus);
-      Break;
-    end;
-  end;
-
-  TFile.WriteAllText(jsonFile, jsonArr.ToJSON);
-  jsonArr.Free;
 end;
 
 function UpdateTrayIconStatus: Integer;
@@ -296,6 +309,40 @@ begin
     FormWake.LoadDefaultIcon
 end;
 
+procedure UpdateJsonEntry(const filePath: string; const newHide, newWake: TDateTime; const newStatus: string);
+var
+  jsonFile, jsonStr: string;
+  jsonArr: TJSONArray;
+  jsonObj: TJSONObject;
+  i: Integer;
+begin
+  jsonFile := GetJsonFilePath;
+  if not TFile.Exists(jsonFile) then Exit;
+
+  jsonStr := TFile.ReadAllText(jsonFile);
+  jsonArr := TJSONObject.ParseJSONValue(jsonStr) as TJSONArray;
+  if not Assigned(jsonArr) then Exit;
+
+  for i := 0 to jsonArr.Count - 1 do
+  begin
+    jsonObj := jsonArr.Items[i] as TJSONObject;
+    if jsonObj.GetValue<string>('path') = filePath then
+    begin
+      jsonObj.RemovePair('hideTime');
+      jsonObj.RemovePair('wakeTime');
+      jsonObj.RemovePair('status');
+
+      jsonObj.AddPair('hideTime', DateToISO8601(newHide, True));
+      jsonObj.AddPair('wakeTime', DateToISO8601(newWake, True));
+      jsonObj.AddPair('status', newStatus);
+      Break;
+    end;
+  end;
+
+  TFile.WriteAllText(jsonFile, jsonArr.ToJSON);
+  jsonArr.Free;
+end;
+
 function GetInfoText(Count: Integer = 0): string;
 begin
   if (Count = 0) then
@@ -321,13 +368,14 @@ begin
     Exit;
   end;
 
-  Inc(BadgeSessionID); // damit alte Threads enden
-  SnoozeActive := False;
-
-  Inc(iNumberOfFiles);
-  FormWake.ShowBlueBadgeIcon;
-  UpdateTrayIconStatus;
-  UpdateSnoozeMenuItems(False);
+//  Schlag auf Schlag-Version für FormToast
+//  Inc(BadgeSessionID); // alte Badge-Threads beenden
+//  SnoozeActive := False;
+//
+//  Inc(iNumberOfFiles);
+//  FormWake.ShowBlueBadgeIcon;
+//  UpdateTrayIconStatus;
+//  UpdateSnoozeMenuItems(False);
 
   if LastWokenFile = '' then
   begin
@@ -336,8 +384,8 @@ begin
   end;
 
   filePath := LastWokenFile;
-  //wakeTime := Now + EncodeTime(0, minutes, 0, 0);
   wakeTime := IncMinute(Now, minutes);
+
   // Datei erneut verstecken
   if FileExists(filePath) then
   begin
@@ -369,20 +417,40 @@ begin
   jsonArr.AddElement(jsonObj);
 
   TFile.WriteAllText(jsonFile, jsonArr.ToJSON);
-  Log(Format('🔁 Schlummern: %s für %d Minuten', [filePath, minutes]));
 
+//  Schlag auf Schlag-Version für FormToast
+//  Log(Format('🔁 Schlummern: %s für %d Minuten', [filePath, minutes]));
+//  jsonArr.Free;
+//
+//  if ShwFiles.Visible then
+//    ShwFiles.actReFreshExecute(nil);
+//
+//  // --- NEU: nichts fortsetzen; Fade/Queue macht der Toast selbst ---
+//  if Assigned(FormToastF) and FormToastF.Visible then
+//  begin
+//    // Optional: Nutzerfeedback im Toast
+//    try
+//      FormToastF.lblMsg.Caption := Format('Erneut schlafen gelegt bis %s', [FormatDateTime('dd.mm.yyyy hh:nn', wakeTime)]);
+//    except end;
+//  end;
+  // --- Ab hier: KEIN Session-Reset, KEIN Advance mehr ---
+
+  Log(Format('🔁 Schlummern: %s für %d Minuten', [filePath, minutes]));
   jsonArr.Free;
-  if (ShwFiles.Visible) then
+
+  if ShwFiles.Visible then
     ShwFiles.actReFreshExecute(nil);
 
-  if (FormToastF.Visible) then
+  // Optional: Nutzerfeedback im Toast aktualisieren (ohne neue Session!)
+  if Assigned(FormToastF) and FormToastF.Visible then
   begin
+    try
+      FormToastF.lblMsg.Caption :=
+        'Erneut schlafen gelegt bis ' + FormatDateTime('dd.mm.yyyy hh:nn', wakeTime);
+    except end;
+    // und einfach ausblenden (Fade-Out). Der 60s‑Takt läuft weiter.
     FormToastF.StartFadeOut;
-    FormToastF.Close;
   end;
-
-  // 🆕 Neue Snooze-Badge starten
-//  FormWake.ShowBadgeIcon;
 end;
 
 function CheckAndWakeFiles: Integer;
@@ -447,39 +515,20 @@ begin
 
         if Now >= wakeTime then
         begin
+          // PATCH 2: NICHT hier unhide/toast/sound – NUR in die RAM-Queue legen und aus JSON entfernen
           if FileExists(filePath) then
           begin
-            if (fileAttr and FILE_ATTRIBUTE_HIDDEN) <> 0 then
-            begin
-              SetFileAttributes(PChar(filePath), fileAttr and not FILE_ATTRIBUTE_HIDDEN);
-              Log('🌞 Datei geweckt: ' + filePath);
-              LastWokenFile := filePath;
-
-              if FormWake.mnuPlaySound.Checked then
-                PlayWakeupSound;
-
-              if (FormWake.mnuSnoozeEnabled.Checked) then
-              begin
-                var aFn := ExtractFileName(filePath);
-                if (Length(aFn) > 30) then
-                  aFn := LeftStr(aFn, 30) + ' ...';
-
-                if FormWake.SchlummernDialog1.Checked then
-                  FormToastF.ShowToast('Die Datei '+ aFn + ' ist aufgewacht.', 'Snooze verfügbar für 60 Sekunden');
-
-                Dec(iNumberOfFiles);
-                FormWake.ShowRedBadgeIcon(60);
-                UpdateSnoozeMenuItems(True);
-              end;
-            end
-            else
-              Log('🔍 WakeTime erreicht, aber Datei war nicht versteckt: ' + filePath);
+            var qi: TWakeItem;
+            qi.Path := filePath;
+            qi.Scheduled := wakeTime;
+            SaveToQueue(qi);
+            Log('➡ In Queue aufgenommen: ' + filePath);
           end
           else
             Log('❌ Datei bei WakeTime nicht gefunden: ' + filePath);
 
           Log('🧹 Datei aus Liste entfernt (WakeTime erreicht): ' + filePath);
-          Continue;
+          Continue; // NICHT zu newList hinzufügen → Entfernen aus JSON
         end;
       end;
 
@@ -487,11 +536,21 @@ begin
       newList.AddElement(jsonObj.Clone as TJSONValue);
     end;
 
+    // iNumberOfFiles auf den neuen JSON-Bestand setzen (schlafende Restanzahl)
+    iNumberOfFiles := newList.Count;
+
+    // JSON MIT DER BEREINIGTEN LISTE ZURÜCKSCHREIBEN
     TFile.WriteAllText(jsonFile, newList.ToJSON);
 
+    // Aufräumen
     processedPaths.Free;
     jsonArr.Free;
     newList.Free;
+
+   // sofort starten, falls etwas wartet und kein Toast gerade aktiv ist
+   if (GetQueueCount > 0) and (not IsActiveWake) and (CurrentTrayState <> tisRed) then
+     StartNextFromQueue;
+
   except
     on E: Exception do
       Log('💥 Fehler beim Verarbeiten von hidden_files.json: ' + E.Message);
@@ -695,6 +754,9 @@ var
 begin
   appIconPath := IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName));
 
+  WakeQueue := TQueue<TWakeItem>.Create;
+  InitializeCriticalSection(QueueCS);
+
   UpdateTrayIconStatus;
 
   TrayIcon1.Icon.Assign(Application.Icon);
@@ -716,13 +778,19 @@ end;
 
 procedure TFormWake.FormDestroy(Sender: TObject);
 begin
+  WakeQueue.Free;
+  DeleteCriticalSection(QueueCS);
+
   TrayIcon1.Visible := False;
 end;
 
 procedure TFormWake.Timer1Timer(Sender: TObject);
 begin
   UpdateTrayIconStatus;
-  UpdateSnoozeMenuItems(False);
+
+  // Snooze-Menü nur ausblenden, wenn KEIN rotes Badge aktiv ist
+  if CurrentTrayState <> tisRed then
+    UpdateSnoozeMenuItems(False);
 
   CheckAndWakeFiles;
 
@@ -779,32 +847,6 @@ end;
 procedure TFormWake.chkAutostartClick(Sender: TObject);
 begin
   UpdateAutoStart(chkAutostart.Checked);
-end;
-
-function IsWhiteIconNeeded: Boolean;
-
-  function IsTaskbarDarkMode: Boolean;
-  var
-    Reg: TRegistry;
-  begin
-    Reg := TRegistry.Create(KEY_READ);
-    try
-      Reg.RootKey := HKEY_CURRENT_USER;
-      if Reg.OpenKeyReadOnly('\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize') then
-        Result := Reg.ReadInteger('SystemUsesLightTheme') = 0
-      else
-        Result := False; // Standard: hell
-    finally
-      Reg.Free;
-    end;
-  end;
-
-begin
-  case CurrentIconTheme of
-    itLight: Result := False;
-    itDark:  Result := True;
-    itAuto:  Result := IsTaskbarDarkMode;
-  end;
 end;
 
 procedure TFormWake.LoadDefaultIcon;
@@ -869,69 +911,89 @@ procedure TFormWake.ShowRedBadgeIcon(durationSecs: Integer = 60);
 var
   thisSession: Integer;
   iconName, appIconFn: string;
+  timeoutMs: Cardinal;
 begin
-  FormWake.Timer1.Enabled := False;
+  if durationSecs < 0 then durationSecs := 0;
+  timeoutMs := Cardinal(durationSecs) * 1000;
 
-  Inc(BadgeSessionID); // Neue Session-ID, alte Threads werden ignoriert
+  Inc(BadgeSessionID);
   thisSession := BadgeSessionID;
-  Log('🆕 Neue Badge-Session: ' + thisSession.ToString);
+  Log(Format('🆕 Neue Badge-Session: %d', [thisSession]));
+  Log(Format('Setze rotes Badge für %d s', [durationSecs]));
 
-  if not (IsWhiteIconNeeded) then
+  // Tray rot
+  if not IsWhiteIconNeeded then
     SetTrayIconFromImageList(2)
   else
     SetTrayIconFromImageList(5);
 
   TrayIcon1.Hint := 'Snooze-Option aktiv';
 
-  // Dynamisches App-Icon festlegen (aus C:\Tools\Sleep\app_badge_X.ico)
-
-  iconName := IfThen(IsWhiteIconNeeded, 'IconWithRedBadge_w.ico', 'IconWithRedBadge.ico');
-
-  appIconFn := appIconPath + iconName;
+  // App-Icon rot
+  iconName  := IfThen(IsWhiteIconNeeded, 'IconWithRedBadge_w.ico', 'IconWithRedBadge.ico');
+  appIconFn := TPath.Combine(appIconPath, iconName);
   SetAppIconFromFile(appIconFn);
 
   UpdateSnoozeMenuItems(True);
 
-  TThread.CreateAnonymousThread(procedure
-  begin
-    Sleep(durationSecs * 1000);
-    TThread.Synchronize(nil, procedure
+  // ⬇️ Asynchron warten – NUR hier die Weiterkettung steuern
+  TThread.CreateAnonymousThread(
+    procedure
     begin
-      if thisSession = BadgeSessionID then
-      begin
-        Log('⏱ Snooze-Badge läuft ab – Standardicon wiederherstellen');
-        FormWake.ShowBlueBadgeIcon;
-        UpdateTrayIconStatus;
-        UpdateSnoozeMenuItems(False);
-        FormWake.Timer1.Enabled := True;
-      end
-      else
-        Log('⏩ Snooze-Badge vorzeitig ersetzt – Icon bleibt bestehen');
-        UpdateSnoozeMenuItems(False);
-        FormWake.Timer1.Enabled := True;
-    end);
-  end).Start;
+      Sleep(timeoutMs);
+      TThread.Synchronize(nil,
+        procedure
+        begin
+          if thisSession = BadgeSessionID then
+          begin
+            Log('⏱ Snooze-Badge läuft ab');
+
+            // WICHTIG:
+            // - KEIN Check auf (CurrentTrayState <> tisRed), denn wir SIND in der roten Phase.
+            // - Kein IsActiveWake nötig; der Toast ist nach 15 s ausgeblendet.
+            if GetQueueCount > 0 then
+            begin
+              // Nächsten Toast sofort starten (Schlag auf Schlag)
+              StartNextFromQueue;
+            end
+            else
+            begin
+              // Keine Queue mehr → Snooze-Menü aus, Icon gem. JSON-Bestand
+              UpdateSnoozeMenuItems(False);
+              iNumberOfFiles := UpdateTrayIconStatus;
+              if iNumberOfFiles = 0 then
+                FormWake.LoadDefaultIcon
+              else
+                FormWake.ShowBlueBadgeIcon;
+            end;
+          end
+          else
+          begin
+            Log('⏩ Snooze-Badge vorzeitig ersetzt – ältere Session ignoriert');
+            // Nichts weiter; neuere Session steuert den Ablauf.
+          end;
+        end
+      );
+    end
+  ).Start;
 end;
 
 procedure TFormWake.mnuSnooze5Click(Sender: TObject);
 begin
   Log('🔁 Schlummern: ' + LastWokenFile + ' für 5 Minuten');
   DoSnooze(5); // Neue WakeTime setzen etc.
-  ShowBlueBadgeIcon(60);
 end;
 
 procedure TFormWake.mnuSnooze15Click(Sender: TObject);
 begin
-  Log('🔁 Schlummern: ' + LastWokenFile + ' für 5 Minuten');
-  DoSnooze(15); // Neue WakeTime setzen etc.
-  ShowBlueBadgeIcon(60);          // Neuer Badge → alte Session wird automatisch ersetzt
+  Log('🔁 Schlummern: ' + LastWokenFile + ' für 15 Minuten');
+  DoSnooze(15);
 end;
 
 procedure TFormWake.mnuSnooze60Click(Sender: TObject);
 begin
-  Log('🔁 Schlummern: ' + LastWokenFile + ' für 5 Minuten');
+  Log('🔁 Schlummern: ' + LastWokenFile + ' für 60 Minuten');
   DoSnooze(60); // Neue WakeTime setzen etc.
-  ShowBlueBadgeIcon(60);          // Neuer Badge → alte Session wird automatisch ersetzt
 end;
 
 procedure TFormWake.nachneuerVersionsuchen1Click(Sender: TObject);
@@ -1033,6 +1095,171 @@ begin
     // Menü anzeigen
     if Button in [mbLeft, mbRight] then
       TrayIcon1.PopupMenu.Popup(X, Y);
+  end;
+end;
+
+// Queue-Routinen
+procedure SaveToQueue(const item: TWakeItem);
+begin
+  EnterCriticalSection(QueueCS);
+  try
+    WakeQueue.Enqueue(item);
+  finally
+    LeaveCriticalSection(QueueCS);
+  end;
+end;
+
+function GetFromQueue(out item: TWakeItem): Boolean;
+begin
+  EnterCriticalSection(QueueCS);
+  try
+    Result := WakeQueue.Count > 0;
+    if Result then
+      item := WakeQueue.Dequeue;
+  finally
+    LeaveCriticalSection(QueueCS);
+  end;
+end;
+
+function GetQueueCount: Integer;
+begin
+  EnterCriticalSection(QueueCS);
+  try
+    Result := WakeQueue.Count;  // <-- nicht JSON zählen!
+  finally
+    LeaveCriticalSection(QueueCS);
+  end;
+end;
+
+function HasQueuePending: Boolean;
+begin
+  Result := GetQueueCount > 0;
+end;
+
+function IsActiveWake: Boolean;
+begin
+  Result := Assigned(FormToastF) and FormToastF.Visible;
+end;
+
+procedure AdvanceAfterToastIfNeeded;
+begin
+  Log(Format('➡ ToastClose: pending=%d', [GetQueueCount]));
+
+  if (GetQueueCount > 0) and (not IsActiveWake) and (CurrentTrayState <> tisRed) then
+    StartNextFromQueue
+  else
+  begin
+    // sonst sauber auf Blau/Default
+    UpdateSnoozeMenuItems(False);
+    iNumberOfFiles := UpdateTrayIconStatus; // setzt Blue/Default je nach JSON‑Bestand
+    if iNumberOfFiles = 0 then
+      FormWake.LoadDefaultIcon
+    else
+      FormWake.ShowBlueBadgeIcon;
+  end;
+end;
+
+procedure StartNextFromQueue(Force: Boolean = False);
+var
+  nextItem: TWakeItem;
+  attrs: DWORD;
+  title: string;
+begin
+  if (not Force) and IsActiveWake then
+  begin
+    Log('⛔ StartNextFromQueue abgebrochen: Toast aktiv');
+    Exit;
+  end;
+
+  // Nächsten holen
+  if not GetFromQueue(nextItem) then
+  begin
+    // nichts mehr → blau zurück
+    FormWake.ShowBlueBadgeIcon;
+    UpdateTrayIconStatus;
+    UpdateSnoozeMenuItems(False);
+    Exit;
+  end;
+
+  // Für Snooze usw. merken
+  LastWokenFile := nextItem.Path;
+
+  // Datei JETZT erst sichtbar machen
+  if FileExists(nextItem.Path) then
+  begin
+    attrs := GetFileAttributes(PChar(nextItem.Path));
+    if (attrs <> INVALID_FILE_ATTRIBUTES) and ((attrs and FILE_ATTRIBUTE_HIDDEN) <> 0) then
+      SetFileAttributes(PChar(nextItem.Path), attrs and not FILE_ATTRIBUTE_HIDDEN);
+  end;
+
+  // (Optional) Sound
+  if FormWake.mnuPlaySound.Checked then
+    PlayWakeupSound;
+
+  // --- WICHTIG: ROTES BADGE IMMER SETZEN, UNABHÄNGIG VOM TOAST ---
+  FormWake.ShowRedBadgeIcon(60);         // <<<<<< immer!
+  UpdateSnoozeMenuItems(True);
+
+  // Toast nur, wenn eingeschaltet
+  if FormWake.SchlummernDialog1.Checked then
+  begin
+    title := ExtractFileName(nextItem.Path);
+    if Length(title) > 30 then
+      title := LeftStr(title, 30) + ' ...';
+
+    FormToastF.ShowToast('Die Datei ' + title + ' ist aufgewacht.', 'Snooze verfügbar für 60 Sekunden');
+  end;
+
+  var pending := GetQueueCount;
+  if pending > 0 then
+    FormWake.TrayIcon1.Hint := Format('Snooze-Option aktiv' + sLineBreak + 'Wartend: %d', [pending])
+  else
+    FormWake.TrayIcon1.Hint := 'Snooze-Option aktiv';
+
+    Log('▶ StartNextFromQueue: ' + nextItem.Path + ' | pending=' + GetQueueCount.ToString);
+end;
+
+procedure AdvanceQueueNow(skipToastClose: Boolean = False);
+begin
+  // Wenn der Toast noch sichtbar ist, NICHT eingreifen
+  if IsActiveWake then
+    Exit;
+
+  if (GetQueueCount > 0) and (not IsActiveWake) and (CurrentTrayState <> tisRed) then
+    StartNextFromQueue
+  else
+  begin
+    // UI sanft zurücksetzen
+    UpdateSnoozeMenuItems(False);
+    iNumberOfFiles := UpdateTrayIconStatus; // setzt Blue/Default je nach JSON-Bestand
+    if iNumberOfFiles = 0 then
+      FormWake.LoadDefaultIcon
+    else
+      FormWake.ShowBlueBadgeIcon;
+  end;
+end;
+
+procedure AdvanceNowDueToUserAction;
+begin
+  // Aktuelle 60s-Session beenden, damit der alte Thread nicht später dazwischen funkt
+  Inc(BadgeSessionID);
+
+  // Wenn der Toast noch sichtbar ist, NICHT doppelt starten
+  if IsActiveWake then
+    Exit;
+
+  // Sofort den nächsten Toast starten, falls vorhanden
+  if GetQueueCount > 0 then
+    StartNextFromQueue(True)  // Force: auch wenn gerade etwas Sichtbarkeit togglen sollte
+  else
+  begin
+    // Keine weitere Datei → UI sauber zurücksetzen
+    UpdateSnoozeMenuItems(False);
+    iNumberOfFiles := UpdateTrayIconStatus;
+    if iNumberOfFiles = 0 then
+      FormWake.LoadDefaultIcon
+    else
+      FormWake.ShowBlueBadgeIcon;
   end;
 end;
 

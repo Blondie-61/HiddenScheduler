@@ -13,6 +13,7 @@ object FormToastF: TFormToastF
   Font.Style = []
   FormStyle = fsStayOnTop
   Position = poDesigned
+  OnClose = FormClose
   OnCreate = FormCreate
   OnShow = FormShow
   PixelsPerInch = 192
@@ -44,6 +45,22 @@ object FormToastF: TFormToastF
     Margins.Right = 6
     Margins.Bottom = 6
     Caption = 'lblMsg'
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -27
+    Font.Name = 'Segoe UI'
+    Font.Style = []
+    ParentFont = False
+  end
+  object lblQueueCount: TLabel
+    Left = 48
+    Top = 143
+    Width = 7
+    Height = 37
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWindowText
     Font.Height = -27

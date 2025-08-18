@@ -1,4 +1,4 @@
-unit FormToastU;
+﻿unit FormToastU;
 
 interface
 
@@ -15,8 +15,11 @@ type
     btnSnooze15: TButton;
     btnSnooze60: TButton;
     btnClose: TButton;
+    lblQueueCount: TLabel;
     procedure FormCreate(Sender: TObject);
     procedure FormShow(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+
     procedure tmrLifeTimer(Sender: TObject);
     procedure tmrFadeTimer(Sender: TObject);
     procedure btnSnoozeClick(Sender: TObject);
@@ -77,39 +80,49 @@ begin
   tmrLife.Interval := 20000;
   tmrLife.Enabled := True;
 
-  tmrFade.Interval := 100;
+  tmrFade.Interval := 50;
   tmrFade.Enabled := True;
 end;
 
-procedure TFormToastF.tmrFadeTimer(Sender: TObject);
+procedure TFormToastF.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-  if AlphaBlendValue < FOpacityTarget then
-    AlphaBlendValue := Min(AlphaBlendValue + 20, FOpacityTarget)
-  else if AlphaBlendValue > FOpacityTarget then
-  begin
-    AlphaBlendValue := Max(AlphaBlendValue - 20, FOpacityTarget);
-    if AlphaBlendValue = 0 then
-    begin
-      tmrFade.Enabled := False;
-      Hide;
-    end;
-  end
-  else
-    tmrFade.Enabled := False;
+  tmrLife.Enabled := False;
 end;
 
 procedure TFormToastF.ShowToast(const title, msg: string);
 begin
   lblTitle.Caption := title;
   lblMsg.Caption := msg;
-  Show;
+
+  var iCnt := GetQueueCount;
+  case iCnt of
+//    0: lblQueueCount.Caption := 'Keine weitere Datei in der Warteschlange';
+    0: lblQueueCount.Caption := '';
+    1: lblQueueCount.Caption := 'Eine weitere Datei in der Warteschlange';
+    else
+      lblQueueCount.Caption := iCnt.ToString + ' weitere Dateien in der Warteschlange';
+  end;
+
+  // Auto-Close/Fade sauber neu initialisieren
+  if Assigned(tmrLife) then
+  begin
+    tmrLife.Enabled := False;
+    tmrLife.Interval := 15000;  // oder aus Settings laden
+    tmrLife.Enabled := True;
+  end;
+
+  // Falls vorhanden: einen Fade-Timer ebenfalls zurücksetzen
+  if Assigned(TmrFade) then
+    TmrFade.Enabled := False;
+
+  Show;  // erst zeigen, nachdem Timer neu gesetzt ist
 end;
 
 procedure TFormToastF.tmrLifeTimer(Sender: TObject);
 begin
   tmrLife.Enabled := False;
-  StartFadeOut;
-  Close;
+  StartFadeOut; // nur Animation
+  // ⚠ KEIN Close hier, sonst AdvanceQueueNow zu früh
 end;
 
 procedure TFormToastF.StartFadeOut;
@@ -118,10 +131,61 @@ begin
   tmrFade.Enabled := True;
 end;
 
+//procedure TFormToastF.tmrFadeTimer(Sender: TObject);
+//begin
+//  if AlphaBlendValue < FOpacityTarget then
+//  begin
+//    // Fade‑IN
+//    AlphaBlendValue := Min(AlphaBlendValue + 20, FOpacityTarget);
+//    if AlphaBlendValue = FOpacityTarget then
+//      tmrFade.Enabled := False;
+//  end
+//  else if AlphaBlendValue > FOpacityTarget then
+//  begin
+//    // Fade‑OUT
+//    AlphaBlendValue := Max(AlphaBlendValue - 20, FOpacityTarget);
+//    if AlphaBlendValue = 0 then
+//    begin
+//      tmrFade.Enabled := False;
+//      Hide;  // << nur verstecken – NICHT AdvanceQueueNow hier!
+//    end;
+//  end
+//  else
+//    tmrFade.Enabled := False;
+//end;
+
+procedure TFormToastF.tmrFadeTimer(Sender: TObject);
+begin
+  if AlphaBlendValue < FOpacityTarget then
+  begin
+    AlphaBlendValue := Min(AlphaBlendValue + 20, FOpacityTarget);
+    if AlphaBlendValue = FOpacityTarget then
+      tmrFade.Enabled := False;
+  end
+  else if AlphaBlendValue > FOpacityTarget then
+  begin
+    AlphaBlendValue := Max(AlphaBlendValue - 20, FOpacityTarget);
+    if AlphaBlendValue = 0 then
+    begin
+      tmrFade.Enabled := False;
+      Hide;
+
+      // ⬇️ NEU: sofort den nächsten Toast starten (falls in Queue),
+      //        statt die restliche Zeit der 60s abzuwarten
+      TThread.Queue(nil,
+        procedure
+        begin
+          WakeHiddenU.AdvanceNowDueToUserAction;
+        end);
+    end;
+  end
+  else
+    tmrFade.Enabled := False;
+end;
+
 procedure TFormToastF.btnCloseClick(Sender: TObject);
 begin
-  StartFadeOut;
-  Close;
+  StartFadeOut; // danach übernimmt tmrFadeTimer das Weiterketteln
 end;
 
 procedure TFormToastF.btnSnoozeClick(Sender: TObject);
@@ -129,8 +193,8 @@ begin
   if TButton(Sender).Name = 'btnSnooze5' then WakeHiddenU.DoSnooze(5)
   else if TButton(Sender).Name = 'btnSnooze15' then WakeHiddenU.DoSnooze(15)
   else if TButton(Sender).Name = 'btnSnooze60' then WakeHiddenU.DoSnooze(60);
-  StartFadeOut;
-  Close;
+
+  StartFadeOut; // KEIN Close, kein Advance hier
 end;
 
 end.

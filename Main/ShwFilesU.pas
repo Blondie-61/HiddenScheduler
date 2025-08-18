@@ -5,7 +5,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.Grids, Vcl.ValEdit, System.Actions, Vcl.ActnList,
-  Vcl.StdCtrls, Math, System.IOUtils, System.JSON, System.DateUtils, System.IniFiles,
+  Vcl.StdCtrls, Math, System.IOUtils, System.JSON, System.DateUtils, System.IniFiles,  System.Generics.Collections,
   VirtualTrees, VirtualTrees.Header, VirtualTrees.Types, VirtualTrees.BaseAncestorVCL, VirtualTrees.BaseTree, VirtualTrees.AncestorVCL, System.ImageList,
   Vcl.ImgList, ShellAPI, CommCtrl, Vcl.Menus, Vcl.ComCtrls;
 
@@ -73,7 +73,7 @@ type
     MinutesToWake: Integer;
   end;
 
-procedure WakeFileNow(const filePath: string);
+procedure WakeFileNow(const FilePath: string; Manual: Boolean = False);
 
 var
   ShwFiles: TShwFiles;
@@ -247,7 +247,7 @@ begin
   end;
 end;
 
-procedure WakeFileNow(const filePath: string);
+procedure WakeFileNow(const FilePath: string; Manual: Boolean = False);
 var
   jsonFile, jsonStr: string;
   jsonArr, newArr: TJSONArray;
@@ -255,6 +255,11 @@ var
   i: Integer;
   fileAttr: DWORD;
 begin
+  if Manual then
+    Log('🙋‍♂️ Manuell aufgeweckt: ' + FilePath)
+  else
+    Log('🌞 Automatisch aufgeweckt: ' + FilePath);
+
   if not FileExists(filePath) then
   begin
     Log('❌ Aufwecken abgebrochen – Datei nicht gefunden: ' + filePath);
@@ -307,18 +312,36 @@ end;
 
 procedure TShwFiles.Jetztaufwecken1Click(Sender: TObject);
 var
-  node: PVirtualNode;
-  data: PFileNodeData;
+  Node: PVirtualNode;
+  Data: PFileNodeData;
+  Paths: TList<string>;
 begin
   FormWake.Timer1.Enabled := False;
-  node := VST.FocusedNode;
-  if not Assigned(node) then Exit;
+  Paths := TList<string>.Create;
+  try
+    Node := VST.GetFirstSelected;
+    while Assigned(Node) do
+    begin
+      Data := VST.GetNodeData(Node);
+      if Assigned(Data) then
+        Paths.Add(IncludeTrailingPathDelimiter(Data^.Directory) + Data^.FileName);
+      Node := VST.GetNextSelected(Node);
+    end;
 
-  data := VST.GetNodeData(node);
-  if not Assigned(data) then Exit;
+    // Doppelte Einträge eliminieren
+    Paths.Sort;
+    for var i := Paths.Count-1 downto 1 do
+      if SameText(Paths[i], Paths[i-1]) then
+        Paths.Delete(i);
 
-  WakeFileNow(IncludeTrailingPathDelimiter(data^.Directory) + data^.FileName);
-  FormWake.Timer1.Enabled := True;
+    // Alle Dateien sofort aufwecken
+    for var path in Paths do
+      WakeFileNow(path, True);
+
+  finally
+    Paths.Free;
+    FormWake.Timer1.Enabled := True;
+  end;
 end;
 
 procedure TShwFiles.PopupVSTPopup(Sender: TObject);
