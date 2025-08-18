@@ -1,0 +1,8 @@
+HiddenScheduler – Changelog
+===========================
+
+Version 1.2.0 (Build 82)
+------------------------
+- Neue Snooze-Funktion für Toast-Benachrichtigungen.
+- Multi-Select im Fenster „ShwFiles“.
+- Badge-Verwaltung optimiert.
