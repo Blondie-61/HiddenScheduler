@@ -1,8 +1,8 @@
-; === SleepSetup_v1.1.0.iss ===
+; === SleepSetup_v1.2.1.iss ===
 
 [Setup]
 AppName=Sleep Tool
-AppVersion=1.1.2 (Build 75)
+AppVersion=1.2.1 (Build 85)
 AppPublisher=BlondieSoft
 DefaultDirName=C:\Tools\Sleep
 DisableProgramGroupPage=yes
@@ -12,9 +12,9 @@ OutputBaseFilename=SleepSetup
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=admin
-VersionInfoVersion=1.1.2
-VersionInfoTextVersion=1.1.2
-VersionInfoProductVersion=1.1.2
+VersionInfoVersion=1.2.1
+VersionInfoTextVersion=1.2.1
+VersionInfoProductVersion=1.2.1
 
 [Files]
 Source: "Sleep.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -45,9 +45,12 @@ Source: "IconWithBlueBadge9_w.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "IconWithBlueBadge9+_w.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "IconWithRedBadge.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "IconWithRedBadge_w.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "C:\Delphi-Projekte\Blondie\WVL\Main\changelog.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\Sleep Tool"; Filename: "{app}\Sleep.exe"
+[Icons]
+; Startmenü-Eintrag "Sleep", startet WakeHidden.exe
+Name: "{autoprograms}\Sleep"; Filename: "{app}\WakeHidden.exe"
 
 [Registry]
 ; --- Altbestand beim Installieren vollständig entfernen ---
@@ -93,6 +96,7 @@ Name: "autostart"; Description: "Sleep automatisch beim Windows-Start starten"; 
 
 [Run]
 Filename: "{app}\WakeHidden.exe"; Description: "Sleep jetzt starten"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\changelog.txt"; Description: "Changelog anzeigen"; Flags: postinstall shellexec skipifsilent
 
 [Code]
 procedure CurStepChanged(CurStep: TSetupStep);

@@ -2,12 +2,12 @@ object ShwFiles: TShwFiles
   Left = 0
   Top = 0
   Caption = 'Dateien zeigen'
-  ClientHeight = 812
-  ClientWidth = 1812
+  ClientHeight = 406
+  ClientWidth = 906
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
-  Font.Height = -24
+  Font.Height = -12
   Font.Name = 'Segoe UI'
   Font.Style = []
   Position = poDesigned
@@ -15,48 +15,38 @@ object ShwFiles: TShwFiles
   OnClose = FormClose
   OnCreate = FormCreate
   OnShow = FormShow
-  PixelsPerInch = 192
   DesignSize = (
-    1812
-    812)
-  TextHeight = 32
+    906
+    406)
+  TextHeight = 15
   object btnReFresh: TButton
-    Left = 1495
-    Top = 10
-    Width = 300
-    Height = 100
-    Margins.Left = 12
-    Margins.Top = 12
-    Margins.Right = 12
-    Margins.Bottom = 12
+    Left = 748
+    Top = 5
+    Width = 150
+    Height = 50
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
     Action = actReFresh
     Anchors = [akTop, akRight]
     TabOrder = 0
   end
   object VST: TVirtualStringTree
     Left = -1
-    Top = 10
-    Width = 1478
-    Height = 752
-    Margins.Left = 6
-    Margins.Top = 6
-    Margins.Right = 6
-    Margins.Bottom = 6
+    Top = 5
+    Width = 740
+    Height = 376
     Anchors = [akLeft, akTop, akRight, akBottom]
-    DefaultNodeHeight = 49
+    DefaultNodeHeight = 25
     Header.AutoSizeIndex = 0
-    Header.Height = 32
+    Header.Height = 15
     Header.MainColumn = -1
-    Header.MaxHeight = 20000
-    Header.MinHeight = 20
     Header.Options = [hoColumnResize, hoDrag, hoShowSortGlyphs, hoHeaderClickAutoSort]
     Header.PopupMenu = PopupVST
     Images = ImageListIcons
-    Indent = 36
-    Margin = 8
     PopupMenu = PopupVST
     TabOrder = 1
-    TextMargin = 8
     OnBeforeCellPaint = VSTxBeforeCellPaint
     OnCompareNodes = VSTxCompareNodes
     OnDblClick = Jetztaufwecken1Click
@@ -68,13 +58,9 @@ object ShwFiles: TShwFiles
   end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 774
-    Width = 1812
-    Height = 38
-    Margins.Left = 6
-    Margins.Top = 6
-    Margins.Right = 6
-    Margins.Bottom = 6
+    Top = 387
+    Width = 906
+    Height = 19
     Panels = <>
     SimplePanel = True
   end

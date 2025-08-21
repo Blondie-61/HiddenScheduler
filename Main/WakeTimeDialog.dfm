@@ -12,6 +12,8 @@ object frmWakeTimeDialog: TfrmWakeTimeDialog
   Font.Name = 'Segoe UI'
   Font.Style = []
   Position = poScreenCenter
+  OnClose = FormClose
+  OnCreate = FormCreate
   OnShow = FormShow
   PixelsPerInch = 192
   TextHeight = 30

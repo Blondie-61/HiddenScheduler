@@ -4,7 +4,7 @@ object FormWake: TFormWake
   BorderStyle = bsNone
   Caption = 'FormWake'
   ClientHeight = 732
-  ClientWidth = 1329
+  ClientWidth = 1330
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText

@@ -93,11 +93,12 @@
         <UWP_DelphiLogo44>..\Resourcen\sleep.png</UWP_DelphiLogo44>
         <UWP_DelphiLogo150>..\Resourcen\sleep.png</UWP_DelphiLogo150>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-        <VerInfo_Build>18</VerInfo_Build>
-        <VerInfo_Keys>CompanyName=Gerhard Waldhelm;FileDescription=$(MSBuildProjectName);FileVersion=1.2.0.18;InternalName=Sleep;LegalCopyright=2025;LegalTrademarks=;OriginalFilename=sleep.exe;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=Benötigt WakeHidden</VerInfo_Keys>
+        <VerInfo_Build>85</VerInfo_Build>
+        <VerInfo_Keys>CompanyName=Gerhard Waldhelm;FileDescription=$(MSBuildProjectName);FileVersion=1.2.1.85;InternalName=Sleep;LegalCopyright=2025;LegalTrademarks=;OriginalFilename=sleep.exe;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=Benötigt WakeHidden</VerInfo_Keys>
         <VerInfo_Debug>true</VerInfo_Debug>
         <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
         <VerInfo_MinorVer>2</VerInfo_MinorVer>
+        <VerInfo_Release>1</VerInfo_Release>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
         <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
@@ -110,11 +111,12 @@
         <Manifest_File>(Ohne)</Manifest_File>
         <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-        <VerInfo_Build>82</VerInfo_Build>
-        <VerInfo_Keys>CompanyName=Gerhard Waldhelm;FileDescription=$(MSBuildProjectName);FileVersion=1.2.0.82;InternalName=;LegalCopyright=2025;LegalTrademarks=;OriginalFilename=sleep.exe;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=benötigt WakeHidden</VerInfo_Keys>
+        <VerInfo_Build>85</VerInfo_Build>
+        <VerInfo_Keys>CompanyName=Gerhard Waldhelm;FileDescription=$(MSBuildProjectName);FileVersion=1.2.1.85;InternalName=;LegalCopyright=2025;LegalTrademarks=;OriginalFilename=sleep.exe;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=benötigt WakeHidden</VerInfo_Keys>
         <Icon_MainIcon>Sleep_con_Icon1.ico</Icon_MainIcon>
         <VerInfo_MinorVer>2</VerInfo_MinorVer>
         <Debugger_RunParams>&quot;C:\Mac\Home\Desktop\mvharen-iphone16ProMax.pdf&quot; morgen</Debugger_RunParams>
+        <VerInfo_Release>1</VerInfo_Release>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
@@ -122,8 +124,8 @@
         </DelphiCompile>
         <DCCReference Include="WakeTimeDialog.pas">
             <Form>frmWakeTimeDialog</Form>
-            <FormType>dfm</FormType>
         </DCCReference>
+        <DCCReference Include="LastWakeStore.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -174,6 +176,12 @@
                     </Platform>
                 </DeployFile>
                 <DeployFile LocalName="Win32\Debug\Sleep_con.exe" Configuration="Debug" Class="ProjectOutput">
+                    <Platform Name="Win32">
+                        <RemoteName>Sleep_con.exe</RemoteName>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile LocalName="Win32\Release\Sleep_con.exe" Configuration="Release" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>Sleep_con.exe</RemoteName>
                         <Overwrite>true</Overwrite>

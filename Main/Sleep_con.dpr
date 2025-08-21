@@ -9,10 +9,15 @@ uses
   System.DateUtils,
   System.JSON,
   Winapi.Windows,
-  WakeTimeDialog in 'WakeTimeDialog.pas' {frmWakeTimeDialog};
+  WakeTimeDialog in 'WakeTimeDialog.pas' {frmWakeTimeDialog},
+  LastWakeStore in 'LastWakeStore.pas';
 
 const
-  ENABLE_LOGGING = True;
+  {$IFDEF DEBUG}
+    ENABLE_LOGGING: Boolean = True;
+  {$ELSE}
+    ENABLE_LOGGING: Boolean = False;
+  {$ENDIF}
 
 function GetAppDataPath: string;
 begin
@@ -52,6 +57,65 @@ begin
   end;
 end;
 
+function AcquireBatchWakeTime(out AWhen: TDateTime; SilentFollowers: Boolean): Boolean;
+const
+  MUTEX_NAME = 'Global\HiddenScheduler_WakeTimeDialog_v1';
+var
+  h: THandle;
+  haveStored: Boolean;
+  stored: TDateTime;
+begin
+  Result := False;
+
+  // Serialisiert die Dialoge und entscheidet, ob Follower still übernehmen
+  h := CreateMutex(nil, False, PChar(MUTEX_NAME));
+  if h = 0 then
+  begin
+    // Fallback ohne Mutex
+    Result := TfrmWakeTimeDialog.Execute(AWhen);
+    Exit;
+  end;
+
+  try
+    // Warten bis wir "dran" sind – Dialoge kommen nacheinander
+    WaitForSingleObject(h, INFINITE);
+
+    // Gibt es bereits eine gespeicherte Zeit?
+    haveStored := LoadLastWakeTime(stored);
+
+    if SilentFollowers and haveStored then
+    begin
+      // Silent-Follower: übernehmen ohne Dialog
+      AWhen := stored;
+      Result := True;
+    end
+    else
+    begin
+      // Leader ODER Standardmodus (kein Silent) ODER kein gespeicherter Wert:
+      // Dialog anzeigen (der ist in FormShow mit ggf. gespeichertem Wert vorbefüllt)
+      if TfrmWakeTimeDialog.Execute(AWhen) then
+      begin
+        SaveLastWakeTime(AWhen); // für nachfolgende Prozesse vorhalten
+        Result := True;
+      end
+      else
+      begin
+        // Abbruch → kein Wert
+        Result := False;
+      end;
+    end;
+
+    ReleaseMutex(h);
+  finally
+    CloseHandle(h);
+  end;
+end;
+
+function IsShiftDown: Boolean;
+begin
+  Result := (GetAsyncKeyState(VK_SHIFT) and $8000) <> 0;
+end;
+
 function GetWakeUpTime(option: string): TDateTime;
 var
   today: Word;
@@ -75,7 +139,7 @@ begin
   end
   else if option = 'z_individuell' then
   begin
-    if not TfrmWakeTimeDialog.Execute(Result) then
+    if not AcquireBatchWakeTime(Result, IsShiftDown) then
       raise Exception.Create('Auswahl abgebrochen. Keine WakeTime festgelegt.');
   end
   else
@@ -186,6 +250,8 @@ begin
       Log('Usage: sleep_con.exe <Dateipfad> <Zeitoption>');
       Exit;
     end;
+
+    Log('Version 1.2.1.85');
 
     // Zeitoption = letzter Parameter
     var option := ParamStr(ParamCount);

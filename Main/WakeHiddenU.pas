@@ -98,7 +98,12 @@ var
   CurrentIconTheme: TIconTheme = itAuto;
   iNumberOfFiles: Integer = 0;
   appIconPath: string = '';
-  ENABLE_LOGGING: Boolean = True;
+
+  {$IFDEF DEBUG}
+    ENABLE_LOGGING: Boolean = True;
+  {$ELSE}
+    ENABLE_LOGGING: Boolean = False;
+  {$ENDIF}
 
 function TaskbarIconEnabled: Boolean;
 function GetAppDataPath: string;
@@ -263,20 +268,30 @@ var
   fileAttr: DWORD;
   hasHidden: Boolean;
 begin
-  // ❗ Rot hat Priorität – wenn aktiv, NICHT ändern
+  // Rot hat Priorität – wenn aktiv, NICHT ändern
   Result := 0;
   if CurrentTrayState = tisRed then Exit;
 
   hasHidden := False;
   jsonFile := GetJsonFilePath;
-  if not FileExists(jsonFile) then Exit;
+
+  // ✅ NEU: Wenn Datei fehlt → konsequent Default-Icon setzen (Tray + App)
+  if not FileExists(jsonFile) then
+  begin
+    iNumberOfFiles := 0;
+    FormWake.LoadDefaultIcon; // setzt Tray + App auf IconWithBlueBadge0(_w)
+    Exit(0);
+  end;
 
   jsonStr := TFile.ReadAllText(jsonFile);
   jsonArr := TJSONObject.ParseJSONValue(jsonStr) as TJSONArray;
-  if not Assigned(jsonArr) or ((jsonArr.Count) = 0) then
+
+  // ✅ Bestehender Fall "leere Liste": ebenfalls Default-Icon
+  if not Assigned(jsonArr) or (jsonArr.Count = 0) then
   begin
-   FormWake.LoadDefaultIcon;
-   Exit;
+    iNumberOfFiles := 0;
+    FormWake.LoadDefaultIcon;
+    Exit(0);
   end;
 
   Result := jsonArr.Count;
@@ -298,15 +313,17 @@ begin
     jsonArr.Free;
   end;
 
-  //if hasHidden and (CurrentTrayState <> tisBlue) then
   if hasHidden then
   begin
     iNumberOfFiles := Result;
-    FormWake.ShowBlueBadgeIcon;
+    FormWake.ShowBlueBadgeIcon; // Tray + App auf blaues Badge (mit Zähler)
   end
   else
-  if not hasHidden and (CurrentTrayState <> tisDefault) then
-    FormWake.LoadDefaultIcon
+  begin
+    // Nichts verborgen → Default
+    iNumberOfFiles := Result; // = Anzahl überwachten Einträge (kann >0 sein)
+    FormWake.LoadDefaultIcon;
+  end;
 end;
 
 procedure UpdateJsonEntry(const filePath: string; const newHide, newWake: TDateTime; const newStatus: string);
@@ -651,7 +668,12 @@ var
 begin
   ini := TIniFile.Create(TPath.Combine(GetAppDataPath, 'settings.ini'));
   try
-    ENABLE_LOGGING := ini.ReadBool('Options', 'Logging', False);
+    {$IFDEF DEBUG}
+      ENABLE_LOGGING := ini.ReadBool('Options', 'Logging', False);
+    {$ELSE}
+      ENABLE_LOGGING := False;
+    {$ENDIF}
+
     FormWake.Timer1.Interval := ini.ReadInteger('Timer', 'Intervall', 15000);
     WakeupSoundFile := ini.ReadString('Sound', 'WakeupSoundFile', '');
     FormWake.mnuPlaySound.Checked := ini.ReadBool('Sound', 'PlayOnWake', False);
@@ -716,7 +738,10 @@ var
 begin
   ini := TIniFile.Create(TPath.Combine(GetAppDataPath, 'settings.ini'));
   try
-    ini.WriteBool('Options', 'Logging', ENABLE_LOGGING);
+    {$IFDEF DEBUG}
+      ini.WriteBool('Options', 'Logging', ENABLE_LOGGING);
+    {$ENDIF}
+
     ini.WriteInteger('Timer', 'Intervall', FormWake.Timer1.Interval);
     ini.WriteBool('Sound', 'PlayOnWake', FormWake.mnuPlaySound.Checked);
     ini.WriteString('Sound', 'WakeupSoundFile', WakeupSoundFile);
@@ -757,7 +782,8 @@ begin
   WakeQueue := TQueue<TWakeItem>.Create;
   InitializeCriticalSection(QueueCS);
 
-  UpdateTrayIconStatus;
+  LoadDefaultIcon;         // ✅ Erst definierter Grundzustand
+  UpdateTrayIconStatus;    // passt ggf. an
 
   TrayIcon1.Icon.Assign(Application.Icon);
   TrayIcon1.PopupMenu := PopupMenu1;

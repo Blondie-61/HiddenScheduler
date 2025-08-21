@@ -556,8 +556,7 @@ var
 begin
   if VST.SelectedCount = 0 then Exit;
 
-  // Dialog EINMAL: liefert WakeTime + optional AutoHideAfter (Minuten)
-  if not TfrmWakeTimeDialog.Execute(WakeTime, AutoHideAfter) then
+  if not TfrmWakeTimeDialog.Execute(WakeTime) then
     raise Exception.Create('Auswahl abgebrochen. Keine WakeTime festgelegt.');
 
   // Auswahl sichern (wichtig: sonst zerhaut Refresh/Invalidate die Iteration)
