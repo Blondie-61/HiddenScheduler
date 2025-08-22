@@ -6,8 +6,12 @@ Mit dem Setup werden alle benötigten Dateien installiert und die Kontextmenü-E
 
 # HiddenScheduler
 
-Ein kleines Windows-Tool zum temporären Verstecken von Dateien über das Explorer-Kontextmenü.  
-Dateien werden für eine bestimmte Zeit unsichtbar gemacht und automatisch wieder eingeblendet – z. B. nach 1h, morgen früh oder am Wochenende. Ideal für Desktop-Aufräumer, Datenverstecker oder Aufschieber. 😎
+Ein kleines Windows-Tool zum temporären Verstecken und Aufwachen zu einem definiertem Zeitpunkt von Dateien über das Explorer-Kontextmenü.  
+Dateien werden für eine bestimmte Zeit unsichtbar gemacht und automatisch wieder eingeblendet – z. B. nach 1h, morgen früh oder am Wochenende. Ideal für Desktop-Aufräumer, Datenverstecker oder Aufschieber.
+
+## Wichtiger Hinweis
+Antiviren-Tools, so auch der Windows-Defender, identifizieren diese Software eventuell als Schadsoftware. In diesem Fall wird das Tray-Programm "wakehidden.exe" ggf. von diesen Programmen gelöscht oder blockiert. Dies geschieht, weil das Setup u.a. in die Registry schreibt, sich in den Autostart einklinkt (optional) und Dateien versteckt. Ihr solltet das Programm als Ausnahme konfigurieren, am Besten den gesamten Programmordner (Default C:\Tools\Sleep). Danke für Euer verständnis.
+😎
 
 ---
 
