@@ -861,6 +861,7 @@ end;
 procedure TFormWake.actExitExecute(Sender: TObject);
 begin
   SaveSettings;
+  PostMessage(Application.Handle, WM_NULL, 0, 0);
   Application.Terminate;
 end;
 
@@ -1100,11 +1101,7 @@ end;
 procedure TFormWake.TrayIcon1MouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   if Button = mbLeft then
-    // Fokus holen, falls notwendig
-    SetForegroundWindow(Handle)
-  else
-  if Button = mbRight then
-    TrayIcon1.PopupMenu.Popup(X, Y);
+    SetForegroundWindow(Handle); // optional, kein Menü!
 end;
 
 // Queue-Routinen

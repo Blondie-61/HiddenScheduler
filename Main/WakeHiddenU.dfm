@@ -405,7 +405,6 @@ object FormWake: TFormWake
   end
   object TrayIcon1: TTrayIcon
     Hint = 'WakeUp'
-    PopupMenu = PopupMenu1
     OnDblClick = TrayIcon1DblClick
     OnMouseUp = TrayIcon1MouseUp
     Left = 688
