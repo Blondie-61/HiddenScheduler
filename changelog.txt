@@ -1,5 +1,20 @@
 HiddenScheduler – Changelog
 ===========================
+Version 1.2.2 (Build 92)
+------------------------
+	•	[Neu] Integrierter Update-Downloader (UpdaterDownloadU) mit Progressbar, Zielordnerwahl, Cancel-Funktion.
+	•	[Fix] TrayIcon-Doppelklick zeigt ShwFiles, ohne dass das Kontextmenü offen bleibt.
+	•	[Fix] Kleinere Bugfixes bei Fokussteuerung von Dialogen.
+	•	[Intern] Umstrukturierung von Update-Funktionen → besser gekapselt und wiederverwendbar.
+
+Version 1.2.1 (Build 85)
+------------------------
+	•	Multiselect im Konsolenprogramm sleep.exe
+	•	Bei mehreren Dateien merkt sich das Tool die zuletzt gewählte Weckzeit.
+		→ Diese Zeit wird automatisch als Default in das nächste Fenster übernommen.
+	•	Schnellmodus mit Shift:
+		→ Wird das Kontextmenü mit gedrückter Shift-Taste aufgerufen, erscheint der Dialog nur ein einziges Mal.
+		Alle markierten Dateien werden auf diese Zeit gesetzt.
 
 Version 1.2.0 (Build 82)
 ------------------------

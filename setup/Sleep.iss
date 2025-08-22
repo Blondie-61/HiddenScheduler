@@ -1,8 +1,8 @@
-; === SleepSetup_v1.2.1.iss ===
+; === SleepSetup_v1.2.2.iss ===
 
 [Setup]
 AppName=Sleep Tool
-AppVersion=1.2.1 (Build 85)
+AppVersion=1.2.2 (Build 92)
 AppPublisher=BlondieSoft
 DefaultDirName=C:\Tools\Sleep
 DisableProgramGroupPage=yes
@@ -12,13 +12,15 @@ OutputBaseFilename=SleepSetup
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=admin
-VersionInfoVersion=1.2.1
-VersionInfoTextVersion=1.2.1
-VersionInfoProductVersion=1.2.1
+VersionInfoVersion=1.2.2
+VersionInfoTextVersion=1.2.2
+VersionInfoProductVersion=1.2.2
 
 [Files]
 Source: "Sleep.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "WakeHidden.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "libeay32.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "ssleay32.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "sleep.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "icq-uh-oh.wav"; DestDir: "{app}"; Flags: ignoreversion
 Source: "IconWithBlueBadge0.ico"; DestDir: "{app}"; Flags: ignoreversion

@@ -9,21 +9,11 @@ uses
   ShwFilesU in 'ShwFilesU.pas' {ShwFiles},
   FormToastU in 'FormToastU.pas' {FormToastF},
   AppIconHostU in 'AppIconHostU.pas' {FormAppIconHost},
-  UpdateChecker in 'UpdateChecker.pas',
-  WakeTimeDialog in 'WakeTimeDialog.pas' {frmWakeTimeDialog};
+  WakeTimeDialog in 'WakeTimeDialog.pas' {frmWakeTimeDialog},
+  UpdaterDownloadU in 'UpdaterDownloadU.pas' {frmUpdaterDownload},
+  SemVerCompare in 'SemVerCompare.pas';
 
 {$R *.res}
-//  function TaskbarIconEnabled: Boolean;
-//  var
-//    ini: TIniFile;
-//  begin
-//    ini := TIniFile.Create(TPath.Combine(GetAppDataPath, 'settings.ini'));
-//    try
-//      Result := ini.ReadBool('Options', 'ShowInTaskbar', True); // Default: aktiv
-//    finally
-//      ini.Free;
-//    end;
-//  end;
 
 begin
   Application.Initialize;

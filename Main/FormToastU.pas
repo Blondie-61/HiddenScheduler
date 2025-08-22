@@ -131,29 +131,6 @@ begin
   tmrFade.Enabled := True;
 end;
 
-//procedure TFormToastF.tmrFadeTimer(Sender: TObject);
-//begin
-//  if AlphaBlendValue < FOpacityTarget then
-//  begin
-//    // Fade‑IN
-//    AlphaBlendValue := Min(AlphaBlendValue + 20, FOpacityTarget);
-//    if AlphaBlendValue = FOpacityTarget then
-//      tmrFade.Enabled := False;
-//  end
-//  else if AlphaBlendValue > FOpacityTarget then
-//  begin
-//    // Fade‑OUT
-//    AlphaBlendValue := Max(AlphaBlendValue - 20, FOpacityTarget);
-//    if AlphaBlendValue = 0 then
-//    begin
-//      tmrFade.Enabled := False;
-//      Hide;  // << nur verstecken – NICHT AdvanceQueueNow hier!
-//    end;
-//  end
-//  else
-//    tmrFade.Enabled := False;
-//end;
-
 procedure TFormToastF.tmrFadeTimer(Sender: TObject);
 begin
   if AlphaBlendValue < FOpacityTarget then

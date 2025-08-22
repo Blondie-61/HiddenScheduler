@@ -90,13 +90,13 @@
         <Icon_MainIcon>WakeHidden_Icon8.ico</Icon_MainIcon>
         <UWP_DelphiLogo44>..\Resourcen\CleanShot 2025-07-04 at 20.02.54@2x.png</UWP_DelphiLogo44>
         <UWP_DelphiLogo150>..\Resourcen\CleanShot 2025-07-04 at 20.02.54@2x.png</UWP_DelphiLogo150>
-        <VerInfo_Build>88</VerInfo_Build>
+        <VerInfo_Build>93</VerInfo_Build>
         <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
-        <VerInfo_Keys>CompanyName=Gerhard Waldhelm;FileDescription=$(MSBuildProjectName);FileVersion=1.2.1.88;InternalName=WakeFile;LegalCopyright=2025 by Wa;LegalTrademarks=;OriginalFilename=WakeHidden;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=Gerhard Waldhelm;FileDescription=$(MSBuildProjectName);FileVersion=1.2.2.93;InternalName=WakeFile;LegalCopyright=2025 by Wa;LegalTrademarks=;OriginalFilename=WakeHidden;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
         <DCC_UnitSearchPath>C:\Delphi-Projekte\Komponenten\Virtual-TreeView-master\Source;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <VerInfo_MinorVer>2</VerInfo_MinorVer>
         <VerInfo_Debug>true</VerInfo_Debug>
-        <VerInfo_Release>1</VerInfo_Release>
+        <VerInfo_Release>2</VerInfo_Release>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
         <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
@@ -109,11 +109,11 @@
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_Locale>1031</VerInfo_Locale>
         <Icon_MainIcon>WakeHidden_Icon7.ico</Icon_MainIcon>
-        <VerInfo_Build>85</VerInfo_Build>
-        <VerInfo_Keys>CompanyName=Gerhard Waldhelm;FileDescription=$(MSBuildProjectName);FileVersion=1.2.1.85;InternalName=;LegalCopyright=2025;LegalTrademarks=;OriginalFilename=WakeHidden.exe;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=Geschrieben von Gerhard Waldhelm</VerInfo_Keys>
+        <VerInfo_Build>92</VerInfo_Build>
+        <VerInfo_Keys>CompanyName=Gerhard Waldhelm;FileDescription=$(MSBuildProjectName);FileVersion=1.2.2.92;InternalName=;LegalCopyright=2025;LegalTrademarks=;OriginalFilename=WakeHidden.exe;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=Geschrieben von Gerhard Waldhelm</VerInfo_Keys>
         <VerInfo_MinorVer>2</VerInfo_MinorVer>
         <DCC_UnitSearchPath>C:\Delphi-Projekte\Komponenten\Virtual-TreeView-master\Source;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
-        <VerInfo_Release>1</VerInfo_Release>
+        <VerInfo_Release>2</VerInfo_Release>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
@@ -132,11 +132,15 @@
             <Form>FormAppIconHost</Form>
             <FormType>dfm</FormType>
         </DCCReference>
-        <DCCReference Include="UpdateChecker.pas"/>
         <DCCReference Include="WakeTimeDialog.pas">
             <Form>frmWakeTimeDialog</Form>
             <FormType>dfm</FormType>
         </DCCReference>
+        <DCCReference Include="UpdaterDownloadU.pas">
+            <Form>frmUpdaterDownload</Form>
+            <FormType>dfm</FormType>
+        </DCCReference>
+        <DCCReference Include="SemVerCompare.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -172,6 +176,12 @@
                     </Platform>
                 </DeployFile>
                 <DeployFile LocalName="Win32\Debug\WakeHidden.exe" Configuration="Debug" Class="ProjectOutput">
+                    <Platform Name="Win32">
+                        <RemoteName>WakeHidden.exe</RemoteName>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile LocalName="Win32\Release\WakeHidden.exe" Configuration="Release" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>WakeHidden.exe</RemoteName>
                         <Overwrite>true</Overwrite>

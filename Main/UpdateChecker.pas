@@ -7,10 +7,11 @@ uses
 
 type
   TUpdateInfo = record
-    TagName: string;
+    TagName:      string;
     ReleaseNotes: string;
-    DownloadURL: string;
-    IsNewer: Boolean;
+    DownloadURL:  string;
+    IsNewer:      Boolean;
+    PublishedAt:  TDateTime;
   end;
 
 function SimplifyMarkdownForGitHub(const md: string): string;
@@ -80,7 +81,6 @@ begin
   FreeMem(VerInfo, VerInfoSize);
 end;
 
-
 function GetAppVersion: string;
 var
   V1, V2, V3, V4: word;
@@ -101,65 +101,86 @@ begin
   Result := NormalizeVersion(RemoteVer) > NormalizeVersion(CurrentVer);
 end;
 
+/// Liefert TRUE, wenn auf GitHub eine neuere Version als CurrentVersion vorliegt.
+/// Füllt Info.TagName, Info.ReleaseNotes, Info.DownloadURL (asset "SleepSetup.exe").
+/// Fallback-URL wird automatisch gebildet, falls kein Asset gefunden wird.
 function CheckForUpdate(const CurrentVersion: string; out Info: TUpdateInfo): Boolean;
 var
-  client: THttpClient;
-  response: IHTTPResponse;
-  json: TJSONObject;
-  assets: TJSONArray;
-  asset: TJSONObject;
-  i: Integer;
-  releaseTag, releaseBody, downloadUrl: string;
+  client : THTTPClient;
+  resp   : IHTTPResponse;
+  json   : TJSONObject;
+  assets : TJSONArray;
+  asset  : TJSONObject;
+  i      : Integer;
+  tag    : string;
+  body   : string;
+  dlUrl  : string;
+  dtStr  : string;
 begin
   Result := False;
   FillChar(Info, SizeOf(Info), 0);
 
-  client := THttpClient.Create;
+  client := THTTPClient.Create;
   try
-    // Abfrage über die GitHub-API
-    response := client.Get('https://api.github.com/repos/Blondie-61/HiddenScheduler/releases/latest');
+    // GitHub möchte einen UA-Header, sonst drohen 403 in manchen Umgebungen
+    client.UserAgent := 'HiddenScheduler-UpdateChecker/1.0 (+Delphi)';
+    client.CustomHeaders['Accept'] := 'application/vnd.github+json';
 
-    if response.StatusCode = 200 then
-    begin
-      json := TJSONObject.ParseJSONValue(response.ContentAsString()) as TJSONObject;
+    // "latest" = neuester Stable-Release (kein PreRelease)
+    resp := client.Get('https://api.github.com/repos/Blondie-61/HiddenScheduler/releases/latest');
+
+    if resp.StatusCode <> 200 then
+      Exit; // sauber abbrechen
+
+    json := TJSONObject(TJSONObject.ParseJSONValue(resp.ContentAsString(TEncoding.UTF8)));
+    try
+      if json = nil then Exit;
+
+      tag  := json.GetValue<string>('tag_name');
+      body := json.GetValue<string>('body');
+
+      // Veröffentlichungszeitpunkt (optional)
+      if json.TryGetValue<string>('published_at', dtStr) then
       try
-        releaseTag := json.GetValue<string>('tag_name');
-        releaseBody := json.GetValue<string>('body');
+        Info.PublishedAt := ISO8601ToDate(dtStr, True);
+      except
+        Info.PublishedAt := 0;
+      end;
 
-        Info.TagName := releaseTag;
-        Info.ReleaseNotes := releaseBody;
-        Info.IsNewer := IsVersionNewer(CurrentVersion, releaseTag);
+      Info.TagName      := tag;
+      Info.ReleaseNotes := body;
+      Info.IsNewer      := IsVersionNewer(CurrentVersion, tag);
 
-        // Nach bestimmtem Asset suchen (Setup-Datei)
-        if json.TryGetValue<TJSONArray>('assets', assets) then
+      // Passendes Asset finden (Case-insensitive) → "SleepSetup.exe"
+      dlUrl := '';
+      if json.TryGetValue<TJSONArray>('assets', assets) then
+      begin
+        for i := 0 to assets.Count - 1 do
         begin
-          for i := 0 to assets.Count - 1 do
-          begin
-            asset := assets.Items[i] as TJSONObject;
+          asset := TJSONObject(assets.Items[i]);
+          if asset = nil then Continue;
 
-            // Hier musst Du den echten Dateinamen eintragen:
-            if asset.GetValue<string>('name').ToLower = 'sleepsetup.exe' then
-            begin
-              downloadUrl := asset.GetValue<string>('browser_download_url');
-              Info.DownloadURL := downloadUrl;
-              Break;
-            end;
+          var name := asset.GetValue<string>('name');
+          if SameText(name, 'SleepSetup.exe') then
+          begin
+            dlUrl := asset.GetValue<string>('browser_download_url');
+            Break;
           end;
         end;
-
-        // Falls keine URL gefunden wurde → generischen Download-Link versuchen
-        if Info.DownloadURL = '' then
-        begin
-          Info.DownloadURL := Format(
-            'https://github.com/Blondie-61/HiddenScheduler/releases/download/%s/SleepSetup.exe',
-            [releaseTag]
-          );
-        end;
-
-        Result := Info.IsNewer;
-      finally
-        json.Free;
       end;
+
+      // Fallback: direkter Release-Download-Link
+      if dlUrl = '' then
+        dlUrl := Format(
+          'https://github.com/Blondie-61/HiddenScheduler/releases/download/%s/SleepSetup.exe',
+          [tag]
+        );
+
+      Info.DownloadURL := dlUrl;
+
+      Result := Info.IsNewer;
+    finally
+      json.Free;
     end;
   finally
     client.Free;

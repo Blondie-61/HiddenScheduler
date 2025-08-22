@@ -132,7 +132,7 @@ implementation
 {$R *.dfm}
 {$R WakeHidden.res}
 
-uses ShwFilesU, FormToastU, UpdateChecker;
+uses ShwFilesU, FormToastU, UpdaterDownloadU;
 
 function TaskbarIconEnabled: Boolean;
 var
@@ -1023,29 +1023,15 @@ begin
 end;
 
 procedure TFormWake.nachneuerVersionsuchen1Click(Sender: TObject);
-var
-  currentVersion: string;
-  updateInfo: TUpdateInfo;
 begin
-  currentVersion := GetAppVersion; // z. B. '1.1.0'
+  var V1, V2, V3, V4: word;
+  GetBuildInfo(V1, V2, V3, V4);
 
-  if CheckForUpdate(currentVersion, updateInfo) then
-  begin
-    if MessageDlg(
-      Format('Eine neue Version (%s) ist verfügbar!' + sLineBreak + sLineBreak +
-             'Möchten Sie das Update jetzt herunterladen und installieren?' + sLineBreak + sLineBreak +
-             'Änderungen:' + sLineBreak + '%s',
-             [updateInfo.TagName, SimplifyMarkdownForGitHub(updateInfo.ReleaseNotes)]),
-      mtInformation, [mbYes, mbNo], 0) = mrYes then
-    begin
-      OpenURL(updateInfo.DownloadURL);
-    end;
-  end
+  var currentVersion := GetAppVersion;
+  if TryUpdate(currentVersion) then
+    ShowMessage('Download abgeschlossen.')
   else
-  begin
-    MessageDlg('Du verwendest bereits die aktuellste Version (' + currentVersion + ').',
-               mtInformation, [mbOK], 0);
-  end;
+    MessageDlg('Du verwendest bereits die aktuellste' + LineFeed + 'Version (' + currentVersion + ' (Build: ' + V4.ToString + ')).', mtInformation, [mbOK], 0);
 end;
 
 procedure TFormWake.Scannenaus1Click(Sender: TObject);
@@ -1114,14 +1100,11 @@ end;
 procedure TFormWake.TrayIcon1MouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   if Button = mbLeft then
-  begin
     // Fokus holen, falls notwendig
-    SetForegroundWindow(Handle);
-
-    // Menü anzeigen
-    if Button in [mbLeft, mbRight] then
-      TrayIcon1.PopupMenu.Popup(X, Y);
-  end;
+    SetForegroundWindow(Handle)
+  else
+  if Button = mbRight then
+    TrayIcon1.PopupMenu.Popup(X, Y);
 end;
 
 // Queue-Routinen

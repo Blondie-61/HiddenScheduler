@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <BorlandProject>
 	<Transactions>
-    <Transaction>1899.12.30 00:00:00.000.860,C:\Delphi-Projekte\Blondie\WVL\Main\HideFile.dproj=C:\Delphi-Projekte\Blondie\WVL\Main\Sleep_con.dproj</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.730,C:\Mac\Home\Documents\Embarcadero\Studio\Projekte\Project1.dproj=C:\Delphi-Projekte\Blondie\WVL\Main\HideFile.dproj</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.097,C:\Delphi-Projekte\Blondie\WVL\Main\Unit1.dfm=C:\Delphi-Projekte\Blondie\WVL\Main\WakeTimeDialog.dfm</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.097,C:\Delphi-Projekte\Blondie\WVL\Main\WakeTimeDialog.dfm=C:\Delphi-Projekte\Blondie\WVL\Main\Unit1.dfm</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.730,C:\Delphi-Projekte\Blondie\WVL\Main\HideFile.dproj=C:\Mac\Home\Documents\Embarcadero\Studio\Projekte\Project1.dproj</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.860,C:\Delphi-Projekte\Blondie\WVL\Main\Sleep_con.dproj=C:\Delphi-Projekte\Blondie\WVL\Main\HideFile.dproj</Transaction>
   </Transactions>
 </BorlandProject>
