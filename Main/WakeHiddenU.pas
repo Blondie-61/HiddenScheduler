@@ -876,6 +876,80 @@ begin
   UpdateAutoStart(chkAutostart.Checked);
 end;
 
+procedure ApplyIconToHandle(h: HWND);
+begin
+  if h <> 0 then
+  begin
+    SendMessage(h, WM_SETICON, ICON_BIG,   Application.Icon.Handle);
+    SendMessage(h, WM_SETICON, ICON_SMALL, Application.Icon.Handle);
+  end;
+end;
+
+procedure PushIconEverywhere;
+begin
+  ApplyIconToHandle(Application.Handle);
+  if Assigned(Application.MainForm) then
+    ApplyIconToHandle(Application.MainForm.Handle);
+end;
+
+procedure TFormWake.SetAppIconFromFile(const icoPath: string);
+var
+  tmp: TIcon;
+begin
+  Log('SetAppIconFromFile: ' + icoPath);
+
+  if not FileExists(icoPath) then
+  begin
+    Log('⚠ AppIcon nicht gefunden: ' + icoPath);
+    Exit;
+  end;
+
+  tmp := TIcon.Create;
+  try
+    tmp.LoadFromFile(icoPath);
+
+    // 1) Anwendungssymbol
+    Application.Icon.Assign(tmp);
+
+    // 2) Taskleisten-Symbol (wenn MainFormOnTaskbar=True)
+    //    Taskleiste nimmt das Icon des MainForms
+    try
+      if Assigned(Application.MainForm) then
+        Application.MainForm.Icon.Assign(tmp);
+    except
+      // falls frühe Phase ohne Handle – unkritisch
+    end;
+
+  finally
+    tmp.Free;
+  end;
+
+  // 3) Icons in die Fenster pushen (Taskbar/Titelleiste)
+  PushIconEverywhere;
+
+  // 4) nach hinten stellen, damit Windows Zeit hat, Handle/Taskbar zu aktualisieren
+  PostMessage(Application.Handle, WM_NULL, 0, 0);
+
+//  if (ENABLE_LOGGING) then
+//  begin
+//    var appH, mainH: NativeUInt;
+//    appH  := NativeUInt(Application.Handle);
+//    if Assigned(Application.MainForm) then
+//      mainH := NativeUInt(Application.MainForm.Handle)
+//    else
+//      mainH := 0;
+//
+//    Log(Format(
+//      'MainFormOnTaskbar=%s, HasMain=%s, AppH=%s, MainH=%s',
+//      [ BoolToStr(Application.MainFormOnTaskbar, True),
+//        BoolToStr(Assigned(Application.MainForm), True),
+//        IntToHex(appH,  SizeOf(NativeUInt)*2),
+//        IntToHex(mainH, SizeOf(NativeUInt)*2)
+//      ]
+//    ));
+//  end;
+end;
+
 procedure TFormWake.LoadDefaultIcon;
 var
   IconName, appIconFn: string;
@@ -898,21 +972,6 @@ begin
   UpdateSnoozeMenuItems(False);
 end;
 
-procedure TFormWake.SetAppIconFromFile(const icoPath: string);
-var
-  icon: TIcon;
-begin
-  if not FileExists(icoPath) then Exit;
-
-  icon := TIcon.Create;
-  try
-    icon.LoadFromFile(icoPath);
-    Application.Icon := icon; // Taskleisten-Icon wird aktualisiert
-  finally
-    icon.Free;
-  end;
-end;
-
 procedure TFormWake.ShowBlueBadgeIcon(durationSecs: Integer = 60);
 var
   iconName, appIconFn: string;
@@ -932,6 +991,7 @@ begin
   SetAppIconFromFile(appIconFn);
 
   TrayIcon1.Hint := GetInfoText(iNumberOfFiles);
+  PushIconEverywhere;
 end;
 
 procedure TFormWake.ShowRedBadgeIcon(durationSecs: Integer = 60);
