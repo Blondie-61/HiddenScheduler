@@ -885,69 +885,49 @@ begin
   end;
 end;
 
-procedure PushIconEverywhere;
+function GetTaskbarHwnd: HWND;
 begin
-  ApplyIconToHandle(Application.Handle);
-  if Assigned(Application.MainForm) then
-    ApplyIconToHandle(Application.MainForm.Handle);
+  // Which window represents the taskbar button?
+  if Application.MainFormOnTaskbar and Assigned(Application.MainForm) then
+    Result := Application.MainForm.Handle
+  else if Assigned(Screen.ActiveForm) then
+    Result := Screen.ActiveForm.Handle
+  else
+    Result := Application.Handle; // fallback
+end;
+
+procedure ForceTaskbarIconFromFile(const IcoPath: string);
+var
+  H: HWND;
+  Ico: TIcon;
+begin
+  if not FileExists(IcoPath) then Exit;
+
+  Ico := TIcon.Create;
+  try
+    Ico.LoadFromFile(IcoPath);
+
+    // keep a managed handle alive by assigning to the form & application
+    if Assigned(Application.MainForm) then
+      Application.MainForm.Icon.Assign(Ico);
+    Application.Icon.Assign(Ico);
+
+    H := GetTaskbarHwnd;
+
+    // Explicitly tell Windows to refresh the button’s icon
+    SendMessage(H, WM_SETICON, ICON_BIG,   Ico.Handle);
+    SendMessage(H, WM_SETICON, ICON_SMALL, Ico.Handle);
+
+    // make sure the frame repaints
+    RedrawWindow(H, nil, 0, RDW_FRAME or RDW_INVALIDATE or RDW_ERASE or RDW_UPDATENOW);
+  finally
+    Ico.Free;
+  end;
 end;
 
 procedure TFormWake.SetAppIconFromFile(const icoPath: string);
-var
-  tmp: TIcon;
 begin
-  Log('SetAppIconFromFile: ' + icoPath);
-
-  if not FileExists(icoPath) then
-  begin
-    Log('⚠ AppIcon nicht gefunden: ' + icoPath);
-    Exit;
-  end;
-
-  tmp := TIcon.Create;
-  try
-    tmp.LoadFromFile(icoPath);
-
-    // 1) Anwendungssymbol
-    Application.Icon.Assign(tmp);
-
-    // 2) Taskleisten-Symbol (wenn MainFormOnTaskbar=True)
-    //    Taskleiste nimmt das Icon des MainForms
-    try
-      if Assigned(Application.MainForm) then
-        Application.MainForm.Icon.Assign(tmp);
-    except
-      // falls frühe Phase ohne Handle – unkritisch
-    end;
-
-  finally
-    tmp.Free;
-  end;
-
-  // 3) Icons in die Fenster pushen (Taskbar/Titelleiste)
-  PushIconEverywhere;
-
-  // 4) nach hinten stellen, damit Windows Zeit hat, Handle/Taskbar zu aktualisieren
-  PostMessage(Application.Handle, WM_NULL, 0, 0);
-
-//  if (ENABLE_LOGGING) then
-//  begin
-//    var appH, mainH: NativeUInt;
-//    appH  := NativeUInt(Application.Handle);
-//    if Assigned(Application.MainForm) then
-//      mainH := NativeUInt(Application.MainForm.Handle)
-//    else
-//      mainH := 0;
-//
-//    Log(Format(
-//      'MainFormOnTaskbar=%s, HasMain=%s, AppH=%s, MainH=%s',
-//      [ BoolToStr(Application.MainFormOnTaskbar, True),
-//        BoolToStr(Assigned(Application.MainForm), True),
-//        IntToHex(appH,  SizeOf(NativeUInt)*2),
-//        IntToHex(mainH, SizeOf(NativeUInt)*2)
-//      ]
-//    ));
-//  end;
+  ForceTaskbarIconFromFile(icoPath);
 end;
 
 procedure TFormWake.LoadDefaultIcon;
@@ -991,7 +971,6 @@ begin
   SetAppIconFromFile(appIconFn);
 
   TrayIcon1.Hint := GetInfoText(iNumberOfFiles);
-  PushIconEverywhere;
 end;
 
 procedure TFormWake.ShowRedBadgeIcon(durationSecs: Integer = 60);

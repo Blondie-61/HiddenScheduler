@@ -2,7 +2,7 @@
 
 [Setup]
 AppName=Sleep Tool
-AppVersion=1.2.2 (Build 94)
+AppVersion=1.2.2 (Build 96)
 AppPublisher=BlondieSoft
 DefaultDirName=C:\Tools\Sleep
 DisableProgramGroupPage=yes
