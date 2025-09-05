@@ -87,42 +87,54 @@ end;
 procedure TFormToastF.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   tmrLife.Enabled := False;
+//  AdvanceQueueNow;
 end;
 
 procedure TFormToastF.ShowToast(const title, msg: string);
-begin
-  lblTitle.Caption := title;
-  lblMsg.Caption := msg;
-
-  var iCnt := GetQueueCount;
-  case iCnt of
-//    0: lblQueueCount.Caption := 'Keine weitere Datei in der Warteschlange';
-    0: lblQueueCount.Caption := '';
-    1: lblQueueCount.Caption := 'Eine weitere Datei in der Warteschlange';
+  procedure UpdateQueueLabel;
+  var
+    iCnt: Integer;
+  begin
+    iCnt := GetQueueCount;
+    case iCnt of
+      0: lblQueueCount.Caption := '';
+      1: lblQueueCount.Caption := 'Eine weitere Datei in der Warteschlange.';
     else
-      lblQueueCount.Caption := iCnt.ToString + ' weitere Dateien in der Warteschlange';
+      lblQueueCount.Caption := iCnt.ToString + ' weitere Dateien in der Warteschlange.';
+    end;
+  end;
+begin
+  // ❗ Bereits sichtbar? Dann KEIN neuer Toast, KEIN Timer-Reset!
+  if Visible then
+  begin
+    UpdateQueueLabel;   // optional nur die Warteschlangenanzeige anpassen
+    Exit;
   end;
 
-  // Auto-Close/Fade sauber neu initialisieren
+  // Normaler erster Toast
+  lblTitle.Caption := title;
+  lblMsg.Caption   := msg;
+  UpdateQueueLabel;
+
+  // 15s Lebensdauer initialisieren
   if Assigned(tmrLife) then
   begin
-    tmrLife.Enabled := False;
-    tmrLife.Interval := 15000;  // oder aus Settings laden
-    tmrLife.Enabled := True;
+    tmrLife.Enabled  := False;
+    tmrLife.Interval := 15000;         // ggf. aus Settings
+    tmrLife.Enabled  := True;
   end;
 
-  // Falls vorhanden: einen Fade-Timer ebenfalls zurücksetzen
+  // evtl. Fade-Animation neu starten
   if Assigned(TmrFade) then
     TmrFade.Enabled := False;
 
-  Show;  // erst zeigen, nachdem Timer neu gesetzt ist
+  Show;
 end;
 
 procedure TFormToastF.tmrLifeTimer(Sender: TObject);
 begin
   tmrLife.Enabled := False;
-  StartFadeOut; // nur Animation
-  // ⚠ KEIN Close hier, sonst AdvanceQueueNow zu früh
+  StartFadeOut;
 end;
 
 procedure TFormToastF.StartFadeOut;
@@ -162,6 +174,11 @@ end;
 
 procedure TFormToastF.btnCloseClick(Sender: TObject);
 begin
+  // rote Phase abbrechen
+  WakeHiddenU.BadgeSessionID := WakeHiddenU.BadgeSessionID + 1;
+  WakeHiddenU.UpdateSnoozeMenuItems(False);
+  WakeHiddenU.FormWake.Timer1.Enabled := True;
+
   StartFadeOut; // danach übernimmt tmrFadeTimer das Weiterketteln
 end;
 

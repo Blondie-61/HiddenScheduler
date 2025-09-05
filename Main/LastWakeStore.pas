@@ -29,7 +29,7 @@ begin
   o := TJSONObject.Create;
   try
     o.AddPair('last', DateToISO8601(AWhen, True));
-    o.AddPair('expires', DateToISO8601(IncMinute(Now, 2), True)); // 2 Min gültig
+    o.AddPair('expires', DateToISO8601(IncMinute(Now, 1), True)); // 1 Min gültig
     TFile.WriteAllText(GetLastWakePath, o.ToJSON, TEncoding.UTF8);
   finally
     o.Free;

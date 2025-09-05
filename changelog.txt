@@ -1,7 +1,8 @@
 HiddenScheduler – Changelog
 ===========================
-Version 1.2.2 (Build 92)
+Version 1.2.2 (Build 96)
 ------------------------
+	*	[Fix] Letzter Versuch dem Iconcache Herr zu werden (App-Icon in Taskbar).
 	•	[Neu] Integrierter Update-Downloader (UpdaterDownloadU) mit Progressbar, Zielordnerwahl, Cancel-Funktion.
 	•	[Fix] TrayIcon-Doppelklick zeigt ShwFiles, ohne dass das Kontextmenü offen bleibt.
 	•	[Fix] Kleinere Bugfixes bei Fokussteuerung von Dialogen.

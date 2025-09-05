@@ -2,12 +2,12 @@ object ShwFiles: TShwFiles
   Left = 0
   Top = 0
   Caption = 'Dateien zeigen'
-  ClientHeight = 406
-  ClientWidth = 906
+  ClientHeight = 812
+  ClientWidth = 1894
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
-  Font.Height = -12
+  Font.Height = -24
   Font.Name = 'Segoe UI'
   Font.Style = []
   Position = poDesigned
@@ -15,38 +15,50 @@ object ShwFiles: TShwFiles
   OnClose = FormClose
   OnCreate = FormCreate
   OnShow = FormShow
+  PixelsPerInch = 192
   DesignSize = (
-    906
-    406)
-  TextHeight = 15
+    1894
+    812)
+  TextHeight = 32
   object btnReFresh: TButton
-    Left = 748
-    Top = 5
-    Width = 150
-    Height = 50
+    Left = 1578
+    Top = 10
+    Width = 300
+    Height = 100
+    Margins.Left = 12
+    Margins.Top = 12
+    Margins.Right = 12
+    Margins.Bottom = 12
+    Action = actReFresh
+    Anchors = [akTop, akRight]
+    TabOrder = 0
+    ExplicitLeft = 1496
+  end
+  object VST: TVirtualStringTree
+    Left = 0
+    Top = 11
+    Width = 1560
+    Height = 763
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
     Margins.Bottom = 6
-    Action = actReFresh
-    Anchors = [akTop, akRight]
-    TabOrder = 0
-  end
-  object VST: TVirtualStringTree
-    Left = -1
-    Top = 5
-    Width = 740
-    Height = 376
+    Align = alCustom
     Anchors = [akLeft, akTop, akRight, akBottom]
-    DefaultNodeHeight = 25
+    DefaultNodeHeight = 50
     Header.AutoSizeIndex = 0
-    Header.Height = 15
+    Header.Height = 32
     Header.MainColumn = -1
+    Header.MaxHeight = 20000
+    Header.MinHeight = 20
     Header.Options = [hoColumnResize, hoDrag, hoShowSortGlyphs, hoHeaderClickAutoSort]
     Header.PopupMenu = PopupVST
     Images = ImageListIcons
+    Indent = 36
+    Margin = 8
     PopupMenu = PopupVST
     TabOrder = 1
+    TextMargin = 8
     OnBeforeCellPaint = VSTxBeforeCellPaint
     OnCompareNodes = VSTxCompareNodes
     OnDblClick = Jetztaufwecken1Click
@@ -58,11 +70,16 @@ object ShwFiles: TShwFiles
   end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 387
-    Width = 906
-    Height = 19
+    Top = 774
+    Width = 1894
+    Height = 38
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
     Panels = <>
     SimplePanel = True
+    ExplicitWidth = 1812
   end
   object ActionList1: TActionList
     Left = 1352

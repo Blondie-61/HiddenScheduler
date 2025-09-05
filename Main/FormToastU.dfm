@@ -17,6 +17,9 @@ object FormToastF: TFormToastF
   OnCreate = FormCreate
   OnShow = FormShow
   PixelsPerInch = 192
+  DesignSize = (
+    942
+    294)
   TextHeight = 32
   object lblTitle: TLabel
     Left = 48
@@ -69,7 +72,7 @@ object FormToastF: TFormToastF
     ParentFont = False
   end
   object btnClose: TButton
-    Left = 688
+    Left = 736
     Top = 192
     Width = 150
     Height = 50
@@ -77,7 +80,8 @@ object FormToastF: TFormToastF
     Margins.Top = 6
     Margins.Right = 6
     Margins.Bottom = 6
-    Caption = 'Schlie'#223'en'
+    Anchors = [akRight, akBottom]
+    Caption = 'Abbrechen'
     TabOrder = 3
     OnClick = btnCloseClick
   end
@@ -90,6 +94,7 @@ object FormToastF: TFormToastF
     Margins.Top = 6
     Margins.Right = 6
     Margins.Bottom = 6
+    Anchors = [akRight, akBottom]
     Caption = '5 Min'
     TabOrder = 0
     OnClick = btnSnoozeClick
@@ -103,6 +108,7 @@ object FormToastF: TFormToastF
     Margins.Top = 6
     Margins.Right = 6
     Margins.Bottom = 6
+    Anchors = [akRight, akBottom]
     Caption = '15 Min'
     TabOrder = 1
     OnClick = btnSnoozeClick
@@ -116,6 +122,7 @@ object FormToastF: TFormToastF
     Margins.Top = 6
     Margins.Right = 6
     Margins.Bottom = 6
+    Anchors = [akRight, akBottom]
     Caption = '60 Min'
     TabOrder = 2
     OnClick = btnSnoozeClick
