@@ -1,6 +1,11 @@
 HiddenScheduler – Changelog
 ===========================
 
+1.2.3 (Build 102)
+------------------------
+Toast-Benachrichtigungen und Snooze-Dauer gefixt.
+Kleinere Bugfixes
+
 Version 1.2.0 (Build 82)
 ------------------------
 - Neue Snooze-Funktion für Toast-Benachrichtigungen.

@@ -12,6 +12,7 @@ type
   TWakeItem = record
     Path: string;
     Scheduled: TDateTime;
+    HideTime: TDateTime;
   end;
 
 var
@@ -23,6 +24,11 @@ type
 
 type
   TIconTheme = (itAuto, itLight, itDark);
+
+type
+  TQueueSnapshot = TArray<TWakeItem>;
+
+function GetQueueSnapshot: TQueueSnapshot;
 
 type
   TFormWake = class(TForm)
@@ -111,6 +117,7 @@ var
 function TaskbarIconEnabled: Boolean;
 function GetAppDataPath: string;
 function GetJsonFilePath: string;
+function InRedHold: Boolean;
 procedure Log(const msg: string);
 procedure UpdateSnoozeMenuItems(visible: Boolean);
 function UpdateTrayIconStatus: Integer;
@@ -550,12 +557,12 @@ begin
 
         if Now >= wakeTime then
         begin
-          // PATCH 2: NICHT hier unhide/toast/sound – NUR in die RAM-Queue legen und aus JSON entfernen
           if FileExists(filePath) then
           begin
             var qi: TWakeItem;
-            qi.Path := filePath;
+            qi.Path      := filePath;
             qi.Scheduled := wakeTime;
+            qi.HideTime  := hideTime;     // << NEU
             SaveToQueue(qi);
             Log('➡ In Queue aufgenommen: ' + filePath);
           end
@@ -563,8 +570,26 @@ begin
             Log('❌ Datei bei WakeTime nicht gefunden: ' + filePath);
 
           Log('🧹 Datei aus Liste entfernt (WakeTime erreicht): ' + filePath);
-          Continue; // NICHT zu newList hinzufügen → Entfernen aus JSON
+          Continue;
         end;
+
+//        if Now >= wakeTime then
+//        begin
+//          // PATCH 2: NICHT hier unhide/toast/sound – NUR in die RAM-Queue legen und aus JSON entfernen
+//          if FileExists(filePath) then
+//          begin
+//            var qi: TWakeItem;
+//            qi.Path := filePath;
+//            qi.Scheduled := wakeTime;
+//            SaveToQueue(qi);
+//            Log('➡ In Queue aufgenommen: ' + filePath);
+//          end
+//          else
+//            Log('❌ Datei bei WakeTime nicht gefunden: ' + filePath);
+//
+//          Log('🧹 Datei aus Liste entfernt (WakeTime erreicht): ' + filePath);
+//          Continue; // NICHT zu newList hinzufügen → Entfernen aus JSON
+//        end;
       end;
 
       // === Standardübernahme ===
@@ -955,65 +980,72 @@ var
 begin
   if not FileExists(icoPath) then Exit;
 
+  // 1) App-/Taskbar-Icon mit WM_SETICON setzen (sicheres Refresh!)
+  SetAppIconFromFile(icoPath);  // ruft intern ForceTaskbarIconFromFile → WM_SETICON
+
+  // 2) Tray-Icon 1:1 wie App-Icon
   Ico := TIcon.Create;
   try
     Ico.LoadFromFile(icoPath);
-
-    // App-Icon
-    Application.Icon.Assign(Ico);
-    if Assigned(Application.MainForm) then
-      Application.MainForm.Icon.Assign(Ico);
-
-    // Tray-Icon
     TrayIcon1.Icon.Assign(Ico);
-    // sicheres Refresh fürs Tray
-    TrayIcon1.Visible := False;
+    TrayIcon1.Visible := False;  // forciert Refresh
     TrayIcon1.Visible := True;
   finally
     Ico.Free;
   end;
 end;
 
+function GetBlueIndexForCount(IsWhite: Boolean; Count: Integer): Integer;
+begin
+  if Count <= 0 then
+  begin
+    if IsWhite then
+      Result := 3     // Blue 0 (white)
+    else
+      Result := 0;    // Blue 0 (dark)
+  end
+  else
+  begin
+    if IsWhite then
+      Result := 4     // Blue N (white)
+    else
+      Result := 1;    // Blue N (dark)
+  end;
+end;
+
+function GetRedIndex(IsWhite: Boolean): Integer;
+begin
+  if IsWhite then
+    Result := 5       // Red (white)
+  else
+    Result := 2;      // Red (dark)
+end;
+
 procedure TFormWake.LoadDefaultIcon;
 var
   IconName, appIconFn: string;
-  Ico: TIcon;
 begin
   if InRedHold then Exit;
 
-//  if CurrentTrayState = tisRed then
-//  begin
-//    TrayIcon1.Hint := GetInfoText(iNumberOfFiles);
-//    Exit;
-//  end;
-
-  if not (IsWhiteIconNeeded) then
+  // App-Icon-Datei (hell/dunkel) ermitteln
+  if not IsWhiteIconNeeded then
     IconName := 'IconWithBlueBadge0.ico'
   else
     IconName := 'IconWithBlueBadge0_w.ico';
+  appIconFn := TPath.Combine(appIconPath, IconName);
 
-  appIconFn := appIconPath + IconName;
-
-  if SameTrayAsAppIcon then
+  if SameTrayAsAppIcon and FileExists(appIconFn) then
   begin
-    // Beide Icons identisch aus der Datei – inkl. WM_SETICON fürs Taskbar-Icon
+    // Beides identisch: Taskbar + Tray aus Datei (inkl. forcierter Tray-Refresh)
+    SetBothIconsFromFile(appIconFn);
+  end
+  else
+  begin
+    // Trayicon IMMER aus ImageList (stabil, kein Handle-Overflow)
+    SetTrayIconFromImageList(GetBlueIndexForCount(IsWhiteIconNeeded, 0));
+    // App-Icon separat (Taskbar)
     if FileExists(appIconFn) then
-    begin
-      SetAppIconFromFile(appIconFn);    // <-- sendet WM_SETICON
-      // Tray-Icon 1:1 wie App-Icon
-      TrayIcon1.Icon.Assign(Application.Icon);
-      TrayIcon1.Visible := False;       // sicheres Refresh
-      TrayIcon1.Visible := True;
-    end
-    else
-    begin
-      // Fallback: Tray aus ImageList, App-Icon (falls Datei fehlt) auf Default-„0“
-      if not IsWhiteIconNeeded then
-        SetTrayIconFromImageList(0)
-      else
-        SetTrayIconFromImageList(3);
-      SetAppIconFromFile(appIconFn);    // hat robustes Handling + WM_SETICON
-    end;
+      SetAppIconFromFile(appIconFn);
   end;
 
   TrayIcon1.Hint := 'Alles wach!';
@@ -1023,60 +1055,39 @@ end;
 procedure TFormWake.ShowBlueBadgeIcon(durationSecs: Integer = 60);
 var
   iconName, appIconFn: string;
-  ico: TIcon;
+  count: Integer;
 begin
-  // 1) ROT-SCHUTZ: Wenn gerade die 60s-Snooze-Phase aktiv ist,
-  //    NICHT auf Blau umschalten. (Hinweis trotzdem aktualisieren)
+  // Während Rot-Hold NICHT auf blau umschalten
   if InRedHold then Exit;
 
-//  if CurrentTrayState = tisRed then
-//  begin
-//    TrayIcon1.Hint := GetInfoText(iNumberOfFiles);
-//    Exit;
-//  end;
+  // Zähler bestimmen (0..N)
+  count := iNumberOfFiles;
 
-  // 2) Zieldatei ermitteln (hell/dunkel + 0..9 / 9+)
-  if iNumberOfFiles > 9 then
+  // Ziel-ICO-Datei für App/Taskbar ermitteln (hell/dunkel + 0..9 / 9+)
+  if count > 9 then
     iconName := IfThen(IsWhiteIconNeeded, 'IconWithBlueBadge9+_w.ico', 'IconWithBlueBadge9+.ico')
   else
-    iconName := Format(
-                  IfThen(IsWhiteIconNeeded, 'IconWithBlueBadge%d_w.ico', 'IconWithBlueBadge%d.ico'),
-                  [iNumberOfFiles]
-                );
+    iconName := IfThen(IsWhiteIconNeeded,
+                       Format('IconWithBlueBadge%d_w.ico', [count]),
+                       Format('IconWithBlueBadge%d.ico',   [count]));
 
   appIconFn := TPath.Combine(appIconPath, iconName);
 
-  // 3) Setzlogik abhängig von SameTrayAsAppIcon
-  if SameTrayAsAppIcon then
+  if SameTrayAsAppIcon and FileExists(appIconFn) then
   begin
-    // Beide Icons identisch aus der Datei – inkl. WM_SETICON fürs Taskbar-Icon
-    if FileExists(appIconFn) then
-    begin
-      SetAppIconFromFile(appIconFn);    // <-- sendet WM_SETICON
-      // Tray-Icon 1:1 wie App-Icon
-      TrayIcon1.Icon.Assign(Application.Icon);
-      TrayIcon1.Visible := False;       // sicheres Refresh
-      TrayIcon1.Visible := True;
-    end
-    else
-    begin
-      // Fallback: Tray aus ImageList, App-Icon (falls Datei fehlt) auf Default-„0“
-      if not IsWhiteIconNeeded then SetTrayIconFromImageList(1) else SetTrayIconFromImageList(4);
-      SetAppIconFromFile(appIconFn);    // hat robustes Handling + WM_SETICON
-    end;
+    // Beides identisch (inkl. forcierter Tray-Aktualisierung)
+    SetBothIconsFromFile(appIconFn);
   end
   else
   begin
-    // Unterschiedliche Quellen: Tray aus ImageList, App aus Datei
-    if not IsWhiteIconNeeded then SetTrayIconFromImageList(1) else SetTrayIconFromImageList(4);
-    SetAppIconFromFile(appIconFn);
+    // Tray über ImageList (stabil), App-Icon aus Datei
+    SetTrayIconFromImageList(GetBlueIndexForCount(IsWhiteIconNeeded, count));
+    if FileExists(appIconFn) then
+      SetAppIconFromFile(appIconFn);
   end;
 
-  // 4) State setzen (nur wenn wir nicht rot waren – oben schon abgefangen)
   CurrentTrayState := tisBlue;
-
-  // 5) Tooltip/Hint aktualisieren
-  TrayIcon1.Hint := GetInfoText(iNumberOfFiles);
+  TrayIcon1.Hint := GetInfoText(count);
 end;
 
 procedure TFormWake.ShowRedBadgeIcon(durationSecs: Integer = 60);
@@ -1090,36 +1101,35 @@ begin
   timeoutMs    := Cardinal(durationSecs) * 1000;
   newHoldUntil := Now + (durationSecs / SecsPerDay);
 
-  // ✅ Wenn Rot noch aktiv ist, NICHT neu starten – nur Hold verlängern.
   if InRedHold then
   begin
     if newHoldUntil > RedHoldUntil then
-      RedHoldUntil := newHoldUntil;   // Haltezeit strecken
-    UpdateSnoozeMenuItems(True);      // Menü sichtbar lassen
+      RedHoldUntil := newHoldUntil;
+    UpdateSnoozeMenuItems(True);
     Exit;
   end;
 
-  // Ab hier: wirklich neue rote Session
   Inc(BadgeSessionID);
   thisSession := BadgeSessionID;
 
-  // Tray-Icon rot
-  if not IsWhiteIconNeeded then
-    SetTrayIconFromImageList(2)
+  // Tray: ROT aus ImageList
+  SetTrayIconFromImageList(GetRedIndex(IsWhiteIconNeeded));
+
+  // App-Icon (Taskbar) – Dateiname ohne IfThen
+  if IsWhiteIconNeeded then
+    iconName := 'IconWithRedBadge_w.ico'
   else
-    SetTrayIconFromImageList(5);
+    iconName := 'IconWithRedBadge.ico';
 
-  // App-Icon rot
-  iconName  := IfThen(IsWhiteIconNeeded, 'IconWithRedBadge_w.ico', 'IconWithRedBadge.ico');
   appIconFn := TPath.Combine(appIconPath, iconName);
-  SetAppIconFromFile(appIconFn);
+  if FileExists(appIconFn) then
+    SetAppIconFromFile(appIconFn);
 
-  // Rot fixieren + Snooze-Menü ein
   CurrentTrayState := tisRed;
   RedHoldUntil     := newHoldUntil;
   UpdateSnoozeMenuItems(True);
 
-  // 60s-Fenster asynchron verwalten
+  // Timeout-Thread bleibt wie zuvor (deine letzte Version)
   TThread.CreateAnonymousThread(
     procedure
     begin
@@ -1127,7 +1137,6 @@ begin
       TThread.Synchronize(nil,
         procedure
         begin
-          // Falls eine neuere Session gestartet wurde → diese hier ignorieren
           if thisSession <> BadgeSessionID then
           begin
             Log('⏩ Snooze-Badge vorzeitig ersetzt – ältere Session ignoriert');
@@ -1138,30 +1147,33 @@ begin
 
           if GetQueueCount > 0 then
           begin
-            // ❗NUR starten, wenn wirklich frei: kein Toast sichtbar & kein Rot-Hold mehr
+            // nur starten, wenn wirklich frei
             if (not IsActiveWake) and (not InRedHold) then
-            begin
-              StartNextFromQueue; // startet wiederum Rot & setzt neues Hold
-            end
+              StartNextFromQueue
             else
             begin
-              // Start verschieben – Badge & Snooze bleiben sichtbar
               UpdateSnoozeMenuItems(True);
               Log('⏳ Rot-Timeout: Nächster Start verschoben (Toast aktiv oder Rot hält noch).');
             end;
           end
           else
           begin
-            // Keine Warteschlange → UI zurück auf Default
+            // 🔴 Rot sicher beenden, BEVOR wir umschalten
             UpdateSnoozeMenuItems(False);
             CurrentTrayState := tisDefault;
-            RedHoldUntil := 0;
 
+            RedHoldUntil := 0;     // Hold beenden
+            Inc(BadgeSessionID);   // <<<<<< ganz wichtig: alte Rot-Threads entwerten
+
+            // Recompute & sauber zurück auf Blau/Default (setzt auch das App-Icon)
             iNumberOfFiles := UpdateTrayIconStatus;
             if iNumberOfFiles = 0 then
               LoadDefaultIcon
             else
               ShowBlueBadgeIcon;
+
+            if ShwFiles.Visible then
+              ShwFiles.actReFreshExecute(nil);
           end;
         end
       );
@@ -1271,6 +1283,9 @@ end;
 // Queue-Routinen
 procedure SaveToQueue(const item: TWakeItem);
 begin
+  if not Assigned(WakeQueue) then
+    Exit; // oder: WakeQueue := TQueue<TWakeItem>.Create; InitializeCriticalSection(QueueCS);
+
   EnterCriticalSection(QueueCS);
   try
     WakeQueue.Enqueue(item);
@@ -1293,6 +1308,9 @@ end;
 
 function GetQueueCount: Integer;
 begin
+  if not Assigned(WakeQueue) then
+    Exit(0);
+
   EnterCriticalSection(QueueCS);
   try
     Result := WakeQueue.Count;  // <-- nicht JSON zählen!
@@ -1345,8 +1363,10 @@ begin
     Exit;
   end;
 
-  // Für Snooze usw. merken
-  LastWokenFile := nextItem.Path;
+  // Für Snooze/Anzeige merken
+  LastWokenFile        := nextItem.Path;
+  ActiveWakeScheduled  := nextItem.Scheduled;  // << bereits genutzt
+  ActiveHideTime       := nextItem.HideTime;   // << NEU
 
   // Datei JETZT erst sichtbar machen
   if FileExists(nextItem.Path) then
@@ -1373,6 +1393,10 @@ begin
 
     FormToastF.ShowToast('Die Datei ' + title + ' ist aufgewacht.', 'Snooze ist für 60 Sekunden verfügbar.');
   end;
+
+  // NEU: Grid sofort aktualisieren, damit aktives Item als "queued" sichtbar ist
+  if ShwFiles.Visible then
+    ShwFiles.actReFreshExecute(nil);
 
   var pending := GetQueueCount;
   if pending > 0 then
@@ -1441,6 +1465,22 @@ begin
 
   // Queue ist leer: nichts zu tun. Badge/ Menü verhalten sich nach Timeout-Thread.
   Log('AdvanceNowDueToUserAction: Queue leer.');
+end;
+
+function GetQueueSnapshot: TQueueSnapshot;
+begin
+  if not Assigned(WakeQueue) then
+  begin
+    SetLength(Result, 0);
+    Exit;
+  end;
+
+  EnterCriticalSection(QueueCS);
+  try
+    Result := WakeQueue.ToArray; // keine Mutation
+  finally
+    LeaveCriticalSection(QueueCS);
+  end;
 end;
 
 end.

@@ -49,21 +49,24 @@ type
         CellRect: TRect; var ContentRect: TRect);
     procedure VSTxCompareNodes(Sender: TBaseVirtualTree; Node1, Node2: PVirtualNode;
         Column: TColumnIndex; var Result: Integer);
-    procedure VSTxGetImageIndex(Sender: TBaseVirtualTree; Node: PVirtualNode; Kind:
-        TVTImageKind; Column: TColumnIndex; var Ghosted: Boolean; var ImageIndex:
-        TImageIndex);
     procedure VSTxGetText(Sender: TBaseVirtualTree; Node: PVirtualNode; Column:
         TColumnIndex; TextType: TVSTTextType; var CellText: string);
+    procedure VSTPaintText(Sender: TBaseVirtualTree; const TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex; TextType: TVSTTextType);
+    procedure VSTxGetImageIndex(Sender: TBaseVirtualTree; Node: PVirtualNode; Kind: TVTImageKind; Column: TColumnIndex; var Ghosted: Boolean;
+      var ImageIndex: TImageIndex);
     procedure ApplySnoozeToSelection(Sender: TObject);
  private
     procedure LoadJsonToVST;
     procedure ApplyWakeDialogToSelection;
+    procedure MergeQueueIntoTree;
   public
     { Public-Deklarationen }
   protected
   end;
 
 type
+  TItemStatus = (isHidden, isQueued);
+
   PFileNodeData = ^TFileNodeData;
   TFileNodeData = record
     Directory: string;
@@ -71,6 +74,7 @@ type
     HideTime: TDateTime;
     WakeTime: TDateTime;
     MinutesToWake: Integer;
+    Status: TItemStatus;     // NEU
   end;
 
 procedure WakeFileNow(const FilePath: string; Manual: Boolean = False);
@@ -80,12 +84,25 @@ var
   SysImageList: HIMAGELIST;
   FrstRun : Boolean = True;
   bTskBarEnabled: Boolean;
+  ActiveWakeScheduled: TDateTime = 0;  // geplante WakeTime des aktuell angezeigten Toast-Items
+  ActiveHideTime: TDateTime = 0;       // << NEU
+
+const
+  QUEUE_ICON_IDX = 5; // anpassen, falls anderes Index
 
 implementation
 
 {$R *.dfm}
 
 uses WakeHiddenU, WakeTimeDialog;
+
+function FormatIfSet(const DT: TDateTime): string;
+begin
+  if DT <= 0 then
+    Result := ''
+  else
+    Result := FormatDateTime('dd.mm.yyyy hh:nn:ss', DT);
+end;
 
 procedure TShwFiles.FormCreate(Sender: TObject);
 begin
@@ -127,27 +144,52 @@ begin
     Width := 300;
   end;
 
-  VST.TreeOptions.PaintOptions := VST.TreeOptions.PaintOptions + [toShowButtons, toShowRoot, toShowTreeLines];
-  VST.TreeOptions.SelectionOptions := VST.TreeOptions.SelectionOptions + [toFullRowSelect];
-  VST.TreeOptions.MiscOptions := VST.TreeOptions.MiscOptions + [toEditable];
-  VST.TreeOptions.AutoOptions := VST.TreeOptions.AutoOptions + [toAutoSpanColumns];
-  //VST.TreeOptions.AutoOptions := VST.TreeOptions.AutoOptions - [toAutoSort];
-  VST.Header.Options := VST.Header.Options + [hoAutoResize, hoColumnResize, hoVisible, hoShowSortGlyphs];
+  VST.TreeOptions.PaintOptions     := VST.TreeOptions.PaintOptions + [toShowButtons, toShowRoot, toShowTreeLines, toUseBlendedImages];
+  VST.TreeOptions.SelectionOptions := VST.TreeOptions.SelectionOptions + [toMultiSelect, toFullRowSelect, toExtendedFocus];
+  VST.TreeOptions.MiscOptions      := VST.TreeOptions.MiscOptions + [toEditable, toGridExtensions];
+  VST.TreeOptions.AutoOptions      := VST.TreeOptions.AutoOptions + [toAutoSpanColumns];
+  //VST.TreeOptions.AutoOptions      := VST.TreeOptions.AutoOptions - [toAutoSort];
 
-  VST.NodeDataSize := SizeOf(TFileNodeData);
+  VST.Header.Options               := VST.Header.Options + [hoAutoResize, hoColumnResize, hoVisible, hoShowSortGlyphs];
+  VST.NodeDataSize                 := SizeOf(TFileNodeData);
 
-  with VST.TreeOptions do
-  begin
-    SelectionOptions := SelectionOptions + [toMultiSelect, toFullRowSelect, toExtendedFocus];
-    MiscOptions      := MiscOptions + [toGridExtensions];
-    PaintOptions     := PaintOptions + [toUseBlendedImages];
-  end;
+//  LoadJsonToVST;
 
-  LoadJsonToVST;
+  // Wichtig: Icons wirklich anzeigen lassen
+  VST.Images := ImageListIcons;
+
+  // Spalten nicht „wegauto-resizen“
+  VST.Header.Options := VST.Header.Options - [hoAutoResize];
+  VST.TreeOptions.AutoOptions := VST.TreeOptions.AutoOptions - [toAutoSpanColumns];
+  VST.Header.Options := VST.Header.Options + [hoAutoSpring];
+
+  // OnGetImageIndex eindeutig setzen
+  VST.OnGetImageIndex := VSTxGetImageIndex;
+
+  // NICHT anzeigen
+  Visible := False;
+  Hide;
 end;
 
 procedure TShwFiles.FormShow(Sender: TObject);
 begin
+  // Beim Boot unsichtbar bleiben, aber Daten laden
+  if FrstRun then
+  begin
+    FrstRun := False;
+
+    // Taskbar-Setting respektieren: Fenster NICHT sichtbar machen
+    if TaskbarIconEnabled then
+    begin
+//      Visible := False;   // bleibt zu
+//      Hide;
+      // Daten trotzdem laden
+      LoadJsonToVST;
+      Exit;
+    end;
+  end;
+
+  // Normale Anzeige (wenn der Benutzer wirklich öffnet)
   actRefresh.Execute;
 end;
 
@@ -164,12 +206,9 @@ end;
 
 procedure TShwFiles.FormActivate(Sender: TObject);
 begin
-  if (FrstRun) and (bTskBarEnabled) then
-    if WindowState = wsMinimized then
-      WindowState := wsNormal
-  else
-    FrstRun := False;
+  if FrstRun then Exit; // Startaktivierung ignorieren
 
+  // Nur wenn der User das Fenster wirklich geöffnet hat:
   BringToFront;
   SetForegroundWindow(Handle);
 end;
@@ -224,9 +263,12 @@ begin
     data^.HideTime := hideTime;
     data^.WakeTime := wakeTime;
     data^.MinutesToWake := Round((wakeTime - Now) * 24 * 60);
+    data^.Status := isHidden;
   end;
 
   jsonArr.Free;
+
+  MergeQueueIntoTree;
 
   // Sortierung reaktivieren
   VST.Header.SortColumn := savedSortColumn;
@@ -354,59 +396,9 @@ begin
   FormWake.Timer1.Enabled := True;
 end;
 
-procedure TShwFiles.VSTxBeforeCellPaint(Sender: TBaseVirtualTree; TargetCanvas:
-    TCanvas; Node: PVirtualNode; Column: TColumnIndex; CellPaintMode:
-    TVTCellPaintMode; CellRect: TRect; var ContentRect: TRect);
-begin
-  if VST.GetNodeLevel(Node) = 0 then
-  begin
-    if Node.Index mod 2 = 0 then
-      TargetCanvas.Brush.Color := clWhite
-    else
-      TargetCanvas.Brush.Color := $F0F0F0; // hellgrau
-
-    TargetCanvas.FillRect(CellRect);
-  end;
-end;
-
-procedure TShwFiles.VSTxCompareNodes(Sender: TBaseVirtualTree; Node1, Node2:
-    PVirtualNode; Column: TColumnIndex; var Result: Integer);
-var
-  Data1, Data2: PFileNodeData;
-begin
-  Data1 := Sender.GetNodeData(Node1);
-  Data2 := Sender.GetNodeData(Node2);
-
-  case Column of
-    0: Result := CompareText(Data1^.Directory, Data2^.Directory);
-    1: Result := CompareText(Data1^.FileName, Data2^.FileName);
-    2: Result := CompareDateTime(Data1^.HideTime, Data2^.HideTime);
-    3: Result := CompareDateTime(Data1^.WakeTime, Data2^.WakeTime);
-    4: Result := Data1^.MinutesToWake - Data2^.MinutesToWake;
-  end;
-end;
-
-procedure TShwFiles.VSTxGetImageIndex(Sender: TBaseVirtualTree; Node:
-    PVirtualNode; Kind: TVTImageKind; Column: TColumnIndex; var Ghosted:
-    Boolean; var ImageIndex: TImageIndex);
-
-var
-  Data: PFileNodeData;
-begin
-  if Kind <> ikNormal then Exit;
-  Data := Sender.GetNodeData(Node);
-  if not Assigned(Data) then Exit;
-
-  case Column of
-    0: ImageIndex := 0; // Verzeichnis
-    1: ImageIndex := 1; // Datei
-    2: ImageIndex := 2; // Versteckt seit
-    3: ImageIndex := 3; // WakeTime
-    4: ImageIndex := 4; // Minuten
-  end;
-end;
-
-procedure SleepFile(const filePath: string; minutes: Integer = 0; wakeTime: TDateTime = 0; autoHideAfter: Integer = 0);
+procedure SleepFile(const filePath: string; minutes: Integer = 0;
+                    wakeTime: TDateTime = 0; autoHideAfter: Integer = 0;
+                    doRefresh: Boolean = True);
 var
   jsonFile: string;
   jsonStr: string;
@@ -474,8 +466,127 @@ if wakeTime > 0 then
   else
     Log(Format('💤 SleepFile: %s bis %s', [filePath, DateTimeToStr(finalWake)]));
 
-  if ShwFiles.Visible then
+  if doRefresh and ShwFiles.Visible then
     ShwFiles.actReFreshExecute(nil);
+end;
+
+procedure TShwFiles.VSTxBeforeCellPaint(Sender: TBaseVirtualTree; TargetCanvas:
+    TCanvas; Node: PVirtualNode; Column: TColumnIndex; CellPaintMode:
+    TVTCellPaintMode; CellRect: TRect; var ContentRect: TRect);
+begin
+  if VST.GetNodeLevel(Node) = 0 then
+  begin
+    if Node.Index mod 2 = 0 then
+      TargetCanvas.Brush.Color := clWhite
+    else
+      TargetCanvas.Brush.Color := $F0F0F0; // hellgrau
+
+    TargetCanvas.FillRect(CellRect);
+  end;
+end;
+
+procedure TShwFiles.VSTxCompareNodes(Sender: TBaseVirtualTree; Node1, Node2:
+    PVirtualNode; Column: TColumnIndex; var Result: Integer);
+var
+  Data1, Data2: PFileNodeData;
+begin
+  Data1 := Sender.GetNodeData(Node1);
+  Data2 := Sender.GetNodeData(Node2);
+
+  case Column of
+    0: Result := CompareText(Data1^.Directory, Data2^.Directory);
+    1: Result := CompareText(Data1^.FileName, Data2^.FileName);
+    2: Result := CompareDateTime(Data1^.HideTime, Data2^.HideTime);
+    3: Result := CompareDateTime(Data1^.WakeTime, Data2^.WakeTime);
+    4: Result := Data1^.MinutesToWake - Data2^.MinutesToWake;
+  end;
+end;
+
+procedure TShwFiles.VSTxGetImageIndex(Sender: TBaseVirtualTree; Node: PVirtualNode;
+  Kind: TVTImageKind; Column: TColumnIndex; var Ghosted: Boolean; var ImageIndex: TImageIndex);
+var
+  Data: PFileNodeData;
+begin
+  if Kind <> ikNormal then Exit;
+
+  Data := Sender.GetNodeData(Node);
+  if not Assigned(Data) then Exit;
+
+  // Queue-Zeile: nur in der Minuten-Spalte (4) das Schlange-Icon anzeigen
+  if Data^.Status = isQueued then
+  begin
+    if Column = 4 then
+      ImageIndex := QUEUE_ICON_IDX
+    else
+      ImageIndex := -1;
+    Exit;
+  end;
+
+//  // Queue-Icon hat in Spalte 0 Vorrang
+//  if (Column = 4) and (Data^.Status = isQueued) then
+//  begin
+//    ImageIndex := QUEUE_ICON_IDX;
+//    Ghosted := False;   // sicherheitshalber
+//    Exit;
+//  end;
+
+  // Standard-Zuordnung (deine bisherigen Spalten-Icons)
+  case Column of
+    0: ImageIndex := 0; // Verzeichnis
+    1: ImageIndex := 1; // Datei
+    2: ImageIndex := 2; // Versteckt seit
+    3: ImageIndex := 3; // WakeTime
+    4: ImageIndex := 4; // Minuten
+  else
+    ImageIndex := -1;
+  end;
+end;
+
+procedure TShwFiles.MergeQueueIntoTree;
+var
+  qs: TQueueSnapshot;
+  i: Integer;
+  Node: PVirtualNode;
+  Data: PFileNodeData;
+begin
+  qs := GetQueueSnapshot;
+
+  for i := 0 to High(qs) do
+  begin
+    Node := VST.AddChild(nil);
+    Data := VST.GetNodeData(Node);
+    Data^.Directory     := ExtractFilePath(qs[i].Path);
+    Data^.FileName      := ExtractFileName(qs[i].Path);
+    Data^.HideTime      := qs[i].HideTime;      // << NEU: echte Versteckt-Zeit!
+    Data^.WakeTime      := qs[i].Scheduled;     // geplante Weckung
+    Data^.MinutesToWake := 0;                   // optional
+    Data^.Status        := isQueued;
+  end;
+
+  // Aktives Toast-Item ebenfalls zeigen (solange Toast oder Rot-Hold)
+  if (LastWokenFile <> '') and (IsActiveWake or InRedHold) then
+  begin
+    Node := VST.AddChild(nil);
+    Data := VST.GetNodeData(Node);
+    Data^.Directory     := ExtractFilePath(LastWokenFile);
+    Data^.FileName      := ExtractFileName(LastWokenFile);
+    Data^.HideTime      := ActiveHideTime;       // << NEU
+    Data^.WakeTime      := ActiveWakeScheduled;  // falls 0 → bleibt leer formatiert
+    Data^.MinutesToWake := 0;
+    Data^.Status        := isQueued;
+  end;
+end;
+
+procedure TShwFiles.VSTPaintText(Sender: TBaseVirtualTree; const TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex; TextType: TVSTTextType);
+var
+  Data: PFileNodeData;
+begin
+  Data := VST.GetNodeData(Node);
+  if Assigned(Data) and (Data^.Status = isQueued) then
+  begin
+    TargetCanvas.Font.Color := clGrayText;   // Graustufen-Optik
+    TargetCanvas.Font.Style := [fsItalic];   // optional
+  end;
 end;
 
 procedure TShwFiles.VSTxGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
@@ -483,15 +594,30 @@ procedure TShwFiles.VSTxGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
 var
   Data: PFileNodeData;
 begin
+  CellText := '';
   Data := Sender.GetNodeData(Node);
   if not Assigned(Data) then Exit;
 
+  if Data^.Status = isQueued then
+  begin
+    case Column of
+      0: CellText := Data.Directory;
+      1: CellText := Data.FileName;
+      2: CellText := FormatIfSet(Data.HideTime);   // << NEU: jetzt sichtbar
+      3: CellText := FormatIfSet(Data.WakeTime);
+//      4: CellText := 'Queued';                     // falls Spalte 4 weiterhin existiert
+    end;
+    Exit;
+  end;
+
+  // normale (hidden) Items
   case Column of
     0: CellText := Data.Directory;
     1: CellText := Data.FileName;
-    2: CellText := FormatDateTime('dd.mm.yyyy hh:nn:ss', Data.HideTime);
-    3: CellText := FormatDateTime('dd.mm.yyyy hh:nn:ss', Data.WakeTime);
-    4: CellText := Data.MinutesToWake.ToString;
+    2: CellText := FormatIfSet(Data.HideTime);
+    3: CellText := FormatIfSet(Data.WakeTime);
+    4: if Data.MinutesToWake > 0 then
+         CellText := Data.MinutesToWake.ToString;
   end;
 end;
 
@@ -539,9 +665,16 @@ end;
 
 procedure TShwFiles.Individuell1Click(Sender: TObject);
 begin
+  // Nur wenn die Form sichtbar & fokussiert ist (echte Benutzerinteraktion)
+  if not Self.Visible then Exit;
+  if not Self.Focused and not VST.Focused then Exit;
+
   FormWake.Timer1.Enabled := False;
-  ApplyWakeDialogToSelection;
-  FormWake.Timer1.Enabled := True;
+  try
+    ApplyWakeDialogToSelection;
+  finally
+    FormWake.Timer1.Enabled := True;
+  end;
 end;
 
 procedure TShwFiles.ApplyWakeDialogToSelection;
@@ -551,15 +684,18 @@ var
   Data: PFileNodeData;
   WakeTime: TDateTime;
   AutoHideAfter: Integer; // Minuten, 0 = kein AutoHide
-  FilePath: string;
+  Paths: TList<string>;
   Count, i: Integer;
 begin
   if VST.SelectedCount = 0 then Exit;
 
+  // Init, sonst liest du Müll
+  AutoHideAfter := 0;
+
   if not TfrmWakeTimeDialog.Execute(WakeTime) then
     raise Exception.Create('Auswahl abgebrochen. Keine WakeTime festgelegt.');
 
-  // Auswahl sichern (wichtig: sonst zerhaut Refresh/Invalidate die Iteration)
+  // Auswahl sichern (Nodes) -> daraus gleich Strings extrahieren
   SetLength(SelNodes, VST.SelectedCount);
   Node := VST.GetFirstSelected;
   Count := 0;
@@ -570,32 +706,55 @@ begin
     Node := VST.GetNextSelected(Node);
   end;
 
-  VST.BeginUpdate;
+  // Pfade als STRINGS puffern (unabhängig von Node-Lebensdauer)
+  Paths := TList<string>.Create;
   try
     for i := 0 to High(SelNodes) do
     begin
       Data := VST.GetNodeData(SelNodes[i]);
-      if not Assigned(Data) then Continue;
-
-      FilePath := IncludeTrailingPathDelimiter(Data^.Directory) + Data^.FileName;
-
-      // Speichern: absolutes Datum + optional AutoHideAfter
-      if AutoHideAfter > 0 then
-        SleepFile(FilePath, 0, WakeTime, AutoHideAfter)
-      else
-        SleepFile(FilePath, 0, WakeTime);
-
-      // Model/Anzeige aktualisieren
-      Data^.HideTime      := Now;
-      Data^.WakeTime      := WakeTime;
-      Data^.MinutesToWake := Round((WakeTime - Now) * 24 * 60);
-
-      VST.InvalidateNode(SelNodes[i]);
+      if Assigned(Data) then
+        Paths.Add(IncludeTrailingPathDelimiter(Data^.Directory) + Data^.FileName);
     end;
+
+    // Jetzt Batch-Operation: KEIN Refresh zwischendurch!
+    FormWake.Timer1.Enabled := False;
+    VST.BeginUpdate;
+    try
+      for i := 0 to Paths.Count - 1 do
+      begin
+        if AutoHideAfter > 0 then
+          SleepFile(Paths[i], 0, WakeTime, AutoHideAfter, False)  // doRefresh=False
+        else
+          SleepFile(Paths[i], 0, WakeTime, 0, False);             // doRefresh=False
+      end;
+
+      // (Optional) lokale Anzeige aktualisieren – kann man sich sparen,
+      // weil wir gleich komplett refreshen. Wenn du es behalten willst:
+      {
+      for i := 0 to High(SelNodes) do
+      begin
+        Data := VST.GetNodeData(SelNodes[i]);
+        if Assigned(Data) then
+        begin
+          Data^.HideTime      := Now;
+          Data^.WakeTime      := WakeTime;
+          Data^.MinutesToWake := Round((WakeTime - Now) * 24 * 60);
+          // Wenn du Queue/Status hier setzen willst:
+          // Data^.Status := isHidden;
+          VST.InvalidateNode(SelNodes[i]);
+        end;
+      end;
+      }
+    finally
+      VST.EndUpdate;
+      FormWake.Timer1.Enabled := True;
+    end;
+
   finally
-    VST.EndUpdate;
+    Paths.Free;
   end;
 
+  // EIN finaler Refresh
   actRefresh.Execute;
 end;
 
