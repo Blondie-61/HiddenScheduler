@@ -33,6 +33,7 @@ object FormWake: TFormWake
     end
     object ZeigeDateien1: TMenuItem
       Action = actShwFileShw
+      Default = True
     end
     object N1: TMenuItem
       Caption = '-'
@@ -59,6 +60,10 @@ object FormWake: TFormWake
       Caption = 'Schlummern Dialog'
       Checked = True
     end
+    object chkTrayIconDetail: TMenuItem
+      Caption = 'Trayicon Anzeige detailliert'
+      Checked = True
+    end
     object Taskleistensymbol1: TMenuItem
       AutoCheck = True
       Caption = 'Taskleistensymbol'
@@ -72,7 +77,8 @@ object FormWake: TFormWake
     end
     object Scannenaus1: TMenuItem
       AutoCheck = True
-      Caption = 'automatisch Wecken aus'
+      Caption = 'automatisch Wecken (Scannen)'
+      Checked = True
       OnClick = Scannenaus1Click
     end
     object N4: TMenuItem

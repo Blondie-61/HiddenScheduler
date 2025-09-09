@@ -61,6 +61,7 @@ type
     chkAutostart: TMenuItem;
     mnuVersion: TMenuItem;
     N5: TMenuItem;
+    chkTrayIconDetail: TMenuItem;
 
     procedure FormCreate(Sender: TObject);
     procedure FormShow(Sender: TObject);
@@ -720,11 +721,13 @@ begin
     FormWake.Timer1.Interval := ini.ReadInteger('Timer', 'Intervall', 15000);
     WakeupSoundFile := ini.ReadString('Sound', 'WakeupSoundFile', '');
     FormWake.mnuPlaySound.Checked := ini.ReadBool('Sound', 'PlayOnWake', False);
-    FormWake.Scannenaus1.Checked := ini.ReadBool('Options', 'ScanOff', False);
+    FormWake.Scannenaus1.Checked := not ini.ReadBool('Options', 'ScanOff', False);
     FormWake.mnuSnoozeEnabled.Checked := ini.ReadBool('Options', 'EnableSnooze', False);
     FormWake.SchlummernDialog1.Checked := ini.ReadBool('Options', 'SnoozeDialog', True);
     FormWake.Taskleistensymbol1.Checked := ini.ReadBool('Options', 'ShowInTaskbar', True);
     SameTrayAsAppIcon := ini.ReadBool('Options', 'SameTrayAsAppIcon', False);
+    FormWake.chkTrayIconDetail.Checked := SameTrayAsAppIcon;
+
     // Autostart aus Registry lesen
     var reg := TRegistry.Create(KEY_READ);
     try
@@ -788,11 +791,11 @@ begin
     ini.WriteInteger('Timer', 'Intervall', FormWake.Timer1.Interval);
     ini.WriteBool('Sound', 'PlayOnWake', FormWake.mnuPlaySound.Checked);
     ini.WriteString('Sound', 'WakeupSoundFile', WakeupSoundFile);
-    ini.WriteBool('Options', 'ScanOff', FormWake.Scannenaus1.Checked);
+    ini.WriteBool('Options', 'ScanOff', not FormWake.Scannenaus1.Checked);
     ini.WriteBool('Options', 'EnableSnooze', FormWake.mnuSnoozeEnabled.Checked);
     ini.WriteBool('Options', 'SnoozeDialog', FormWake.SchlummernDialog1.Checked);
     ini.WriteBool('Options', 'AutoStart', FormWake.chkAutostart.Checked);
-    ini.WriteBool('Options', 'SameTrayAsAppIcon', SameTrayAsAppIcon);
+    ini.WriteBool('Options', 'SameTrayAsAppIcon', FormWake.chkTrayIconDetail.Checked);
 
     if CurrentIconTheme = itLight then
       ini.WriteString('Options', 'IconTheme', 'Light')

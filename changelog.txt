@@ -1,5 +1,18 @@
 HiddenScheduler – Changelog
 ===========================
+
+Version 1.2.4 (Build 114)
+-------------------------
+	*		[Neu] Komfortables Update mit automatischer Installation und Neustart nach Download
+
+Version 1.2.4 (Build 110)
+-------------------------
+	*		[Fixes] Bugfixes für Icons:
+	*		App-Icon nach abgelaufener Snooze-Phase nicht auf aktuellen Status gewechselt (blieb rotes Badge)
+	*		Tray-Icon zeigte nach dem ersten Refresh (Timer) nicht mehr die Anzahl der schlafenden Dateien im Badge 
+			sondern nur das neutrale blaue Badge.
+
+
 Version 1.2.2 (Build 96)
 ------------------------
 	*	[Fix] Letzter Versuch dem Iconcache Herr zu werden (App-Icon in Taskbar).

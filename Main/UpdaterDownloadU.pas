@@ -5,7 +5,7 @@ interface
 uses
   System.SysUtils, System.Classes, System.IOUtils, System.StrUtils, System.Types, System.DateUtils, System.Math,
   Vcl.Forms, Vcl.StdCtrls, Vcl.ExtCtrls, Vcl.ComCtrls, Vcl.Dialogs, Vcl.Controls,
-  Winapi.Windows, Winapi.ShlObj, Winapi.ActiveX,
+  Winapi.Windows, Winapi.ShlObj, Winapi.ActiveX,  Winapi.ShellAPI, System.Win.Registry,
   IdHTTP, IdComponent, IdSSLOpenSSL, IdSSLOpenSSLHeaders,
   System.JSON;
 
@@ -49,7 +49,6 @@ type
     FWorked: Int64;
 
     procedure SetDefaultFolder(const ADefault: string);
-    function GetDownloadsFolder: string;
     function PickFolder(const AStartIn: string): string;
     function BytesToNice(const B: Int64): string;
     function ExtractFileNameFromUrl(const AUrl: string): string;
@@ -113,10 +112,319 @@ var
 begin
   GetBuildInfo(V1, V2, V3, V4);
   Result := IntToStr(V1) + '.' + IntToStr(V2) + '.' + IntToStr(V3);
-//  Result := '1.0.0';
+  {$IFDEF DEBUG}
+  //Result := '1.0.0';
+  {$ENDIF};
+end;
+
+function GetDownloadsFolderPath: string;
+var
+  p: PWideChar;
+begin
+  Result := '';
+  p := nil;
+  if Succeeded(SHGetKnownFolderPath(FOLDERID_Downloads, 0, 0, p)) then
+  try
+    Result := p;
+  finally
+    CoTaskMemFree(p);
+  end;
+
+  if Result = '' then
+    Result := TPath.Combine(TPath.GetHomePath, 'Downloads');
+
+  if not TDirectory.Exists(Result) then
+    ForceDirectories(Result);
+end;
+
+// ===== Update-Logik (GitHub "latest") =====
+
+function NormalizeVersion(const Version: string): string;
+begin
+  Result := Version.Trim.ToLower.Replace('v', '');
+end;
+
+function IsVersionNewer(const CurrentVer, RemoteVer: string): Boolean;
+begin
+  // Einfacher lexikographischer Vergleich – für 1.2.10 vs 1.2.2 ggf. durch SemVer ersetzen
+  Result := NormalizeVersion(RemoteVer) > NormalizeVersion(CurrentVer);
+end;
+
+function SimplifyMarkdownForGitHub(const md: string): string;
+var
+  s: string;
+begin
+  s := md;
+  // Checkboxen
+  s := StringReplace(s, '[x]', '✅', [rfReplaceAll, rfIgnoreCase]);
+  s := StringReplace(s, '[ ]', '⬜️', [rfReplaceAll, rfIgnoreCase]);
+  // Emojis (kleine Auswahl)
+  s := StringReplace(s, ':rocket:',  '🚀', [rfReplaceAll, rfIgnoreCase]);
+  s := StringReplace(s, ':wrench:',  '🔧', [rfReplaceAll, rfIgnoreCase]);
+  s := StringReplace(s, ':package:', '📦', [rfReplaceAll, rfIgnoreCase]);
+  s := StringReplace(s, ':bug:',     '🐞', [rfReplaceAll, rfIgnoreCase]);
+  s := StringReplace(s, ':zap:',     '⚡', [rfReplaceAll, rfIgnoreCase]);
+  s := StringReplace(s, ':memo:',    '📝', [rfReplaceAll, rfIgnoreCase]);
+  // Fett & Header vereinfachen
+  s := StringReplace(s, '**', '', [rfReplaceAll]);
+  s := StringReplace(s, '## ', '', [rfReplaceAll]);
+  // Trennlinien
+  s := StringReplace(s, '---', '', [rfReplaceAll]);
+  Result := Trim(s);
+end;
+
+function CheckForUpdate(const CurrentVersion: string; out Info: TUpdateInfo): Boolean;
+var
+  http   : TIdHTTP;
+  ssl    : TIdSSLIOHandlerSocketOpenSSL;
+  resp   : string;
+  json   : TJSONObject;
+  assets : TJSONArray;
+  asset  : TJSONObject;
+  i      : Integer;
+  tag, body, dtStr, dlUrl, name: string;
+begin
+  Result := False;
+  FillChar(Info, SizeOf(Info), 0);
+
+  http := TIdHTTP.Create(nil);
+  ssl  := TIdSSLIOHandlerSocketOpenSSL.Create(nil);
+  try
+    ssl.SSLOptions.Method := sslvTLSv1_2;
+    ssl.SSLOptions.Mode   := sslmClient;
+
+    http.IOHandler := ssl;
+    http.HandleRedirects := True;
+    http.ReadTimeout := 30000;
+    http.ConnectTimeout := 15000;
+
+    // GitHub erwartet UA, Accept
+    http.Request.UserAgent := 'HiddenScheduler-UpdateChecker/1.0 (+Indy)';
+    http.Request.CustomHeaders.Values['Accept'] := 'application/vnd.github+json';
+
+    resp := http.Get('https://api.github.com/repos/Blondie-61/HiddenScheduler/releases/latest');
+
+    json := TJSONObject(TJSONObject.ParseJSONValue(resp));
+    try
+      if json = nil then Exit;
+
+      tag  := json.GetValue<string>('tag_name');
+      body := json.GetValue<string>('body');
+
+      if json.TryGetValue<string>('published_at', dtStr) then
+      try
+        Info.PublishedAt := ISO8601ToDate(dtStr, True);
+      except
+        Info.PublishedAt := 0;
+      end;
+
+      Info.TagName      := tag;
+      Info.ReleaseNotes := body;
+      Info.IsNewer      := IsVersionNewer(CurrentVersion, tag);
+
+      // Asset "SleepSetup.exe" suchen
+      dlUrl := '';
+      if json.TryGetValue<TJSONArray>('assets', assets) then
+      begin
+        for i := 0 to assets.Count - 1 do
+        begin
+          asset := TJSONObject(assets.Items[i]);
+          if asset = nil then Continue;
+          name := asset.GetValue<string>('name');
+          if SameText(name, 'SleepSetup.exe') then
+          begin
+            dlUrl := asset.GetValue<string>('browser_download_url');
+            Break;
+          end;
+        end;
+      end;
+
+      // Fallback: direkter Link per Tag
+      if dlUrl = '' then
+        dlUrl := Format(
+          'https://github.com/Blondie-61/HiddenScheduler/releases/download/%s/SleepSetup.exe',
+          [tag]
+        );
+
+      Info.DownloadURL := dlUrl;
+
+      Result := Info.IsNewer;
+    finally
+      json.Free;
+    end;
+  finally
+    http.Free;
+    ssl.Free;
+  end;
+end;
+
+function WriteRunOnceToRestart: Boolean;
+var
+  R: TRegistry;
+  exePath, valueData: string;
+begin
+  Result := False;
+  exePath := ParamStr(0);
+  valueData := '"' + exePath + '" /afterupdate';  // ggf. eigenen Parameter anpassen
+
+  R := TRegistry.Create(KEY_SET_VALUE);
+  try
+    R.RootKey := HKEY_CURRENT_USER;
+    if R.OpenKey('\Software\Microsoft\Windows\CurrentVersion\RunOnce', True) then
+    begin
+      R.WriteString('HiddenScheduler_Restart', valueData); // WriteString ist eine Prozedur
+      R.CloseKey;
+      Result := True;
+    end;
+  finally
+    R.Free;
+  end;
+end;
+
+function StartInstallerAndExit(const InstallerPath: string): Boolean;
+const
+  // Wunsch-Flags: bei Bedarf /VERYSILENT statt /SILENT verwenden
+  INNO_PARAMS =
+    '/SILENT /SUPPRESSMSGBOXES /NOCANCEL ' +
+    '/CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS /NORESTART';
+var
+  sei: TShellExecuteInfo;
+  logPath, params: string;
+  pid: DWORD;
+  exeToRestart, psCmd: string;
+begin
+  Result := False;
+
+  if not FileExists(InstallerPath) then
+  begin
+    MessageDlg('Installer nicht gefunden:'#13#10 + InstallerPath, mtError, [mbOK], 0);
+    Exit;
+  end;
+
+  // (Optional) Fallback: RunOnce setzen – falls der Relauncher scheitert,
+  // startet die App beim nächsten Login trotzdem.
+  WriteRunOnceToRestart;
+
+  logPath := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) +
+             'HiddenScheduler_Update_' + FormatDateTime('yyyymmdd_hhnnss', Now) + '.log';
+  params  := INNO_PARAMS + ' /LOG="' + logPath + '"';
+
+  ZeroMemory(@sei, SizeOf(sei));
+  sei.cbSize := SizeOf(sei);
+  sei.fMask := SEE_MASK_NOCLOSEPROCESS;
+  sei.Wnd := Application.Handle;
+  sei.lpVerb := 'runas'; // Elevation anfordern
+  sei.lpFile := PChar(InstallerPath);
+  sei.lpParameters := PChar(params);
+  sei.lpDirectory := PChar(ExtractFileDir(InstallerPath));
+  sei.nShow := SW_SHOWNORMAL;
+
+  if not ShellExecuteEx(@sei) then
+  begin
+    MessageDlg('Installer-Start abgebrochen oder fehlgeschlagen.', mtWarning, [mbOK], 0);
+    Exit;
+  end;
+
+  // PID des Installer-Prozesses holen
+  pid := 0;
+  if sei.hProcess <> 0 then
+    pid := GetProcessId(sei.hProcess);
+
+  // Relaunch-Helfer starten (unabhängig von unserer App)
+  // Wartet auf Ende des Installers und startet dann unsere EXE neu.
+  exeToRestart := ParamStr(0);
+  // PowerShell: Wait-Process -Id <pid>; Start-Process "<exe>" "/afterupdate"
+  if pid <> 0 then
+  begin
+    psCmd :=
+      Format(
+        'powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command '+
+        '"try { Wait-Process -Id %d -ErrorAction SilentlyContinue } catch {} ; ' +
+        'Start-Sleep -Seconds 1; ' +
+        'Start-Process -FilePath ''%s'' -ArgumentList ''/afterupdate'' "',
+        [pid, exeToRestart]
+      );
+
+    // Startet den Helfer detached; blockiert uns nicht
+    ShellExecute(0, 'open', 'cmd.exe', PChar('/c ' + psCmd), nil, SW_HIDE);
+  end
+  else
+  begin
+    // Falls keine PID (extrem selten): trotzdem direkt neu starten nach kurzer Wartezeit
+    psCmd :=
+      Format(
+        'powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command '+
+        '"Start-Sleep -Seconds 10; Start-Process -FilePath ''%s'' -ArgumentList ''/afterupdate'' "',
+        [exeToRestart]
+      );
+    ShellExecute(0, 'open', 'cmd.exe', PChar('/c ' + psCmd), nil, SW_HIDE);
+  end;
+
+  // Jetzt sofort sauber beenden, damit Dateien ersetzt werden können
+  Application.Terminate;
+  Result := True;
+end;
+
+function TryUpdate(const CurrentVersion: string): Boolean;
+var
+  Info: TUpdateInfo;
+  notes: string;
+  installerPath: string;
+begin
+  Result := False;
+
+  if not CheckForUpdate(CurrentVersion, Info) then
+    Exit;
+
+  notes := SimplifyMarkdownForGitHub(Info.ReleaseNotes);
+
+  if MessageDlg(
+       Format('Neue Version verfügbar: %s (Du hast %s)'#13#10#13#10 +
+              'Jetzt herunterladen und installieren?'#13#10#13#10 +
+              'Änderungen:'#13#10'%s',
+              [Info.TagName, CurrentVersion, notes]),
+       mtInformation, [mbYes, mbNo], 0) <> mrYes then
+    Exit;
+
+  // 1) Download mit deiner bestehenden Maske
+  if not TfrmUpdaterDownload.Execute(Info.DownloadURL, CurrentVersion,
+                                     'SleepSetup.exe', '') then
+    Exit;
+
+  // 2) Installerpfad im Downloads-Ordner (Name entspricht dem Vorschlag oben)
+  installerPath := TPath.Combine(GetDownloadsFolderPath, 'SleepSetup.exe');
+
+  // 3) Installer starten (elevated) + App schließen; RunOnce sorgt für Neustart
+  if StartInstallerAndExit(installerPath) then
+    Result := True;
 end;
 
 { TfrmUpdaterDownload }
+
+class function TfrmUpdaterDownload.Execute(const AUrl, ACurrentVersion: string;
+  const ASuggestedFileName: string; const ADefaultFolder: string): Boolean;
+var
+  F: TfrmUpdaterDownload;
+begin
+  Result := False;
+  F := TfrmUpdaterDownload.Create(nil);
+  try
+    F.FUrl := AUrl;
+    F.FCurrentVersion := ACurrentVersion;
+    F.FSuggestedName := ASuggestedFileName;
+
+    if Assigned(F.lblTitle) then
+      F.lblTitle.Caption := Format('Update herunterladen (aktuell: %s)', [ACurrentVersion]);
+
+    F.SetDefaultFolder(ADefaultFolder);
+    F.edtUrl.Text := AUrl;
+
+    Result := (F.ShowModal = mrOk);
+  finally
+    F.Free;
+  end;
+end;
+
 procedure TfrmUpdaterDownload.FormCreate(Sender: TObject);
 begin
   Caption := 'Update herunterladen';
@@ -246,37 +554,16 @@ begin
     Result := 'download.bin';
 end;
 
-function TfrmUpdaterDownload.GetDownloadsFolder: string;
-var
-  p: PWideChar;
-begin
-  Result := '';
-  p := nil;
-  // KnownFolder (Vista+)
-  if Succeeded(SHGetKnownFolderPath(FOLDERID_Downloads, 0, 0, p)) then
-  try
-    Result := CoTaskMemStrToString(p);
-  finally
-    CoTaskMemFree(p);
-  end;
-
-  if Result = '' then
-    Result := TPath.Combine(TPath.GetHomePath, 'Downloads');
-
-  if not TDirectory.Exists(Result) then
-    ForceDirectories(Result);
-end;
-
 procedure TfrmUpdaterDownload.SetDefaultFolder(const ADefault: string);
 var
   base: string;
 begin
-  if ADefault <> '' then base := ADefault else base := GetDownloadsFolder;
+  if ADefault <> '' then base := ADefault else base := GetDownloadsFolderPath;
   try
     if (base = '') or not TDirectory.Exists(base) then
-      base := GetDownloadsFolder;
+      base := GetDownloadsFolderPath;
   except
-    base := GetDownloadsFolder;
+    base := GetDownloadsFolderPath;
   end;
   edtFolder.Text := base;
 end;
@@ -419,177 +706,6 @@ begin
     if not Result then
       try TFile.Delete(ATargetFile); except end;
   end;
-end;
-
-class function TfrmUpdaterDownload.Execute(const AUrl, ACurrentVersion: string;
-  const ASuggestedFileName: string; const ADefaultFolder: string): Boolean;
-var
-  F: TfrmUpdaterDownload;
-begin
-  Result := False;
-  F := TfrmUpdaterDownload.Create(nil);
-  try
-    F.FUrl := AUrl;
-    F.FCurrentVersion := ACurrentVersion;
-    F.FSuggestedName := ASuggestedFileName;
-
-    if Assigned(F.lblTitle) then
-      F.lblTitle.Caption := Format('Update herunterladen (aktuell: %s)', [ACurrentVersion]);
-
-    F.SetDefaultFolder(ADefaultFolder);
-    F.edtUrl.Text := AUrl;
-
-    Result := (F.ShowModal = mrOk);
-  finally
-    F.Free;
-  end;
-end;
-
-// ===== Update-Logik (GitHub "latest") =====
-
-function NormalizeVersion(const Version: string): string;
-begin
-  Result := Version.Trim.ToLower.Replace('v', '');
-end;
-
-function IsVersionNewer(const CurrentVer, RemoteVer: string): Boolean;
-begin
-  // Einfacher lexikographischer Vergleich – für 1.2.10 vs 1.2.2 ggf. durch SemVer ersetzen
-  Result := NormalizeVersion(RemoteVer) > NormalizeVersion(CurrentVer);
-end;
-
-function SimplifyMarkdownForGitHub(const md: string): string;
-var
-  s: string;
-begin
-  s := md;
-  // Checkboxen
-  s := StringReplace(s, '[x]', '✅', [rfReplaceAll, rfIgnoreCase]);
-  s := StringReplace(s, '[ ]', '⬜️', [rfReplaceAll, rfIgnoreCase]);
-  // Emojis (kleine Auswahl)
-  s := StringReplace(s, ':rocket:',  '🚀', [rfReplaceAll, rfIgnoreCase]);
-  s := StringReplace(s, ':wrench:',  '🔧', [rfReplaceAll, rfIgnoreCase]);
-  s := StringReplace(s, ':package:', '📦', [rfReplaceAll, rfIgnoreCase]);
-  s := StringReplace(s, ':bug:',     '🐞', [rfReplaceAll, rfIgnoreCase]);
-  s := StringReplace(s, ':zap:',     '⚡', [rfReplaceAll, rfIgnoreCase]);
-  s := StringReplace(s, ':memo:',    '📝', [rfReplaceAll, rfIgnoreCase]);
-  // Fett & Header vereinfachen
-  s := StringReplace(s, '**', '', [rfReplaceAll]);
-  s := StringReplace(s, '## ', '', [rfReplaceAll]);
-  // Trennlinien
-  s := StringReplace(s, '---', '', [rfReplaceAll]);
-  Result := Trim(s);
-end;
-
-function CheckForUpdate(const CurrentVersion: string; out Info: TUpdateInfo): Boolean;
-var
-  http   : TIdHTTP;
-  ssl    : TIdSSLIOHandlerSocketOpenSSL;
-  resp   : string;
-  json   : TJSONObject;
-  assets : TJSONArray;
-  asset  : TJSONObject;
-  i      : Integer;
-  tag, body, dtStr, dlUrl, name: string;
-begin
-  Result := False;
-  FillChar(Info, SizeOf(Info), 0);
-
-  http := TIdHTTP.Create(nil);
-  ssl  := TIdSSLIOHandlerSocketOpenSSL.Create(nil);
-  try
-    ssl.SSLOptions.Method := sslvTLSv1_2;
-    ssl.SSLOptions.Mode   := sslmClient;
-
-    http.IOHandler := ssl;
-    http.HandleRedirects := True;
-    http.ReadTimeout := 30000;
-    http.ConnectTimeout := 15000;
-
-    // GitHub erwartet UA, Accept
-    http.Request.UserAgent := 'HiddenScheduler-UpdateChecker/1.0 (+Indy)';
-    http.Request.CustomHeaders.Values['Accept'] := 'application/vnd.github+json';
-
-    resp := http.Get('https://api.github.com/repos/Blondie-61/HiddenScheduler/releases/latest');
-
-    json := TJSONObject(TJSONObject.ParseJSONValue(resp));
-    try
-      if json = nil then Exit;
-
-      tag  := json.GetValue<string>('tag_name');
-      body := json.GetValue<string>('body');
-
-      if json.TryGetValue<string>('published_at', dtStr) then
-      try
-        Info.PublishedAt := ISO8601ToDate(dtStr, True);
-      except
-        Info.PublishedAt := 0;
-      end;
-
-      Info.TagName      := tag;
-      Info.ReleaseNotes := body;
-      Info.IsNewer      := IsVersionNewer(CurrentVersion, tag);
-
-      // Asset "SleepSetup.exe" suchen
-      dlUrl := '';
-      if json.TryGetValue<TJSONArray>('assets', assets) then
-      begin
-        for i := 0 to assets.Count - 1 do
-        begin
-          asset := TJSONObject(assets.Items[i]);
-          if asset = nil then Continue;
-          name := asset.GetValue<string>('name');
-          if SameText(name, 'SleepSetup.exe') then
-          begin
-            dlUrl := asset.GetValue<string>('browser_download_url');
-            Break;
-          end;
-        end;
-      end;
-
-      // Fallback: direkter Link per Tag
-      if dlUrl = '' then
-        dlUrl := Format(
-          'https://github.com/Blondie-61/HiddenScheduler/releases/download/%s/SleepSetup.exe',
-          [tag]
-        );
-
-      Info.DownloadURL := dlUrl;
-
-      Result := Info.IsNewer;
-    finally
-      json.Free;
-    end;
-  finally
-    http.Free;
-    ssl.Free;
-  end;
-end;
-
-function TryUpdate(const CurrentVersion: string): Boolean;
-var
-  Info: TUpdateInfo;
-  notes: string;
-begin
-  Result := False;
-
-  if not CheckForUpdate(CurrentVersion, Info) then
-    Exit; // keine neuere Version
-
-  notes := SimplifyMarkdownForGitHub(Info.ReleaseNotes);
-
-  if MessageDlg(
-       Format('Neue Version verfügbar: %s (Du hast %s)'#13#10#13#10 +
-              'Jetzt herunterladen und speichern?'#13#10#13#10 +
-              'Änderungen:'#13#10'%s',
-              [Info.TagName, CurrentVersion, notes]),
-       mtInformation, [mbYes, mbNo], 0) <> mrYes then
-    Exit;
-
-  // Downloader mit URL + aktueller Version starten (Zielname optional vorbelegt)
-  if TfrmUpdaterDownload.Execute(Info.DownloadURL, CurrentVersion,
-                                 'SleepSetup.exe', '') then
-    Result := True;
 end;
 
 end.
